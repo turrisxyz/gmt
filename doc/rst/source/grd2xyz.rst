@@ -78,7 +78,7 @@ Optional Arguments
     weights equal to the area each node represents.  For Cartesian grids this
     is simply the product of the *x* and *y* increments (except for
     gridline-registered grids at all sides [half] and corners [quarter]).
-    For geographic grids we default to a length unit of **k** (hence area is in km^2). Change
+    For geographic grids we default to a length unit of **k** (hence area is in km:math:`^2`). Change
     this by appending **+u**\ *unit* (see `Units`_). For such grids, the area
     varies with latitude and also sees special cases for gridline-registered layouts
     at sides, corners, and poles.
@@ -173,7 +173,7 @@ the remote file @AFR.nc file, using scanline orientation, run::
 
     gmt grd2xyz @AFR.nc -ZTLf > AFR.b
 
-To write out *lon, lat, topo, area* from the @AFR.nc file, selecting meter^2 as the area unit,
+To write out *lon, lat, topo, area* from the @AFR.nc file, selecting m:math:`^2` as the area unit,
 and where *area* reflects the size of each grid box, run::
 
     gmt grd2xyz @AFR.nc -Wa+ue > AFR.txt

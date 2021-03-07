@@ -80,7 +80,7 @@ Optional Arguments
     Change the current value of Poisson's ratio [0.25].
 
 **-Cy**\ *Young*
-    Change the current value of Young's modulus [7.0e10 N/m^2].
+    Change the current value of Young's modulus [7.0e10 N/m:math:`^2`].
 
 .. _-F:
 

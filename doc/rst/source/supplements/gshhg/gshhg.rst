@@ -34,7 +34,7 @@ container ancestor*, where hierarchical levels for coastline polygons go
 from 1 (shoreline) to 4 (lake inside island inside lake inside land).
 Source is either W (World Vector Shoreline) or C (CIA World Data Bank
 II); lower case is used if a lake is a river-lake. The *west east south
-north* is the enclosing rectangle, *area* is the polygon area in km^2
+north* is the enclosing rectangle, *area* is the polygon area in km:ath:`^2`
 while *f\_area* is the actual area of the ancestor polygon, *container*
 is the ID of the polygon that contains this polygon (-1 if none), and
 *ancestor* is the ID of the polygon in the full resolution set that was

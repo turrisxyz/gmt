@@ -241,7 +241,7 @@ and finally scale radians to micro-radians:
     gmt grdfft faa.nc -Ig -A38 -S1e6 -V -Gdefl_38.nc
 
 Second vertical derivatives of gravity anomalies are related to the
-curvature of the field. We can compute these as mGal/m^2 by::
+curvature of the field. We can compute these as mGal/m:math:`^2` by::
 
     gmt grdfft gravity.nc -D -D -V -Ggrav_2nd_derivative.nc
 

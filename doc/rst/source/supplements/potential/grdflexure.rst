@@ -77,7 +77,7 @@ Required Arguments
 **-D**\ *rm*/*rl*\ [/*ri*]\ /*rw*
     Sets density for mantle, load, infill, and water (or air).  If *ri* differs from
     *rl* then an approximate solution will be found.  If *ri* is not given
-    then it defaults to *rl*.  Values may be given in km/m^3 or g/cm^3.
+    then it defaults to *rl*.  Values may be given in km/m^:math:`^3` or g/cm:math:`^3`.
 
 .. _-E:
 
@@ -118,7 +118,7 @@ Optional Arguments
     Change the default value of Poisson's ratio [0.25].
 
 **-Cy**\ *Young*
-    Change the default value of Young's modulus [7.0e10 N/m^2].
+    Change the default value of Young's modulus [7.0e10 N/m:math:`^2`].
 
 .. _-F:
 

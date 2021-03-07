@@ -99,12 +99,12 @@ Optional Arguments
     *v* separately and combined.  Optionally, append a filename and we will
     write the data table, augmented by two extra columns after each of the
     *u* and *v* columns holding the spline estimates and misfits.  If **-W**
-    is given we also add two more columns with the chi^2 values.
+    is given we also add two more columns with the :math:`\chi^2` values.
 
 .. _-F:
 
 **-F**\ [**d**\|\ **f**]\ *fudge*\
-    The Green's functions are proportional to terms like 1/r^2 and log(r)
+    The Green's functions are proportional to terms like :math:`1/r^2` and :math:`\log(r)`
     and thus blow up for r == 0.  To prevent that we offer two fudging schemes:
     **-Fd**\ *del_radius* lets you add a constant offset to all radii
     and must be specified in the user units.  Alternatively, use

@@ -51,7 +51,7 @@ Required Arguments
     The file describing cross-sectional polygons of one or more bodies.  Polygons
     will be automatically closed if not already closed, and repeated vertices will
     be eliminated.  The segment header for each body will be examined for a density
-    parameter in kg/m^3; see **-D** for overriding this value.
+    parameter in kg/m:math:`^3`; see **-D** for overriding this value.
 
 Optional Arguments
 ------------------
@@ -64,7 +64,7 @@ Optional Arguments
 .. _-D:
 
 **-D**\ *unit*
-    Sets a fixed density contrast that overrides any per-body settings in the model file, in kg/m^3.
+    Sets a fixed density contrast that overrides any per-body settings in the model file, in kg/m:math:`^3`.
 
 .. _-F:
 
@@ -132,7 +132,7 @@ Examples
 --------
 
 To compute the free-air anomalies on an equidistant profile over a 2-D body that has been contoured
-and saved to body2d.txt, using 1700 kg/m^3 as a constant density contrast, with all distances in meters,
+and saved to body2d.txt, using 1700 kg/m:math:`^3` as a constant density contrast, with all distances in meters,
 try
 
 ::

@@ -184,8 +184,8 @@ Required Arguments
         we default to the IGF 1980. Alternatively, specify the field
         directly using **-Af** (see that option for more details).
     **ceot**
-        Calculated Eotvos correction from navigation, using E =
-        7.5038 \* V \* cos(lat) \* sin(az) + 0.004154 \* V^2
+        Calculated Eotvos correction from navigation, using
+        :math:`E = 7.5038 v \cos(lat) \sin(\alpha) + 0.004154 v^2`
         (in mGal). Sign: Correction is to be added to uncorrected faa to
         yield a corrected faa.
 
@@ -555,17 +555,13 @@ Igf
 The equations used are reproduced here using coefficients extracted
 directly from the source code (let us know if you find errors):
 
-(1) g = 978052.0 \* [1 + 0.005285 \* sin^2(lat) - 7e-6 \* sin^2(2\*lat)
-+ 27e-6 \* cos^2(lat) \* cos^2(lon-18)]
+(1) :math:`g = 978052.0 [1 + 0.005285 \sin^2(\theta) - 7e-6 \sin^2(2\*\theta) + 27e-6 \cos^2(\theta) \cos^2(\lambda-18)]`
 
-(2) g = 978049.0 \* [1 + 0.0052884 \* sin^2(lat) - 0.0000059 \*
-sin^2(2\*lat)]
+(2) :math:`g = 978049.0 [1 + 0.0052884 \sin^2(\theta) - 0.0000059 \sin^2(2\theta)]`
 
-(3) g = 978031.846 \* [1 + 0.0053024 \* sin^2(lat) - 0.0000058 \*
-sin^2(2\*lat)]
+(3) :math:`g = 978031.846  [1 + 0.0053024 \sin^2(\theta) - 0.0000058 \sin^2(2\*\theta)]
 
-(4) g = 978032.67714 \* [(1 + 0.00193185138639 \* sin^2(lat)) / sqrt (1
-- 0.00669437999013 \* sin^2(lat))]
+(4) :math:`g = 978032.67714 \frac{1 + 0.00193185138639 \sin^2(\theta)}{\sqrt{1 - 0.00669437999013 \sin^2(\theta)}}`
 
 Corrections
 -----------

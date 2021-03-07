@@ -60,27 +60,26 @@ Required Arguments
     squares approach.  Each type implies a certain input data record
     format:
 
-    **c** will fit f(**p**) = *a* (a constant offset);
+    **c** will fit :math:`f(\bf{p}) = a` (a constant offset);
     records must contain track COE, ID1, ID2.
 
-    **d** will fit f(**p**) = *a* + *b* \* *d* (linear
+    **d** will fit :math:`f(\bf{p}) = a + b d` (linear
     drift; *d* is distance along track; records must contain d1, d2, COE, ID1, ID2.
 
-    **g** will fit f(**p**) = *a* + *b* sin(y)^2
-    (1980-1930 gravity correction); records must contain crossing latitude y, COE, ID1, ID2.
+    **g** will fit :math:`f(\bf{p}) = a + b \sin(y)^2`
+    (1980-1930 gravity correction); records must contain crossing latitude *y*, COE, ID1, ID2.
 
-    **h** will fit f(**p**) = *a* + *b* cos(h) + *c*
-    cos(2h) + *d* sin(h) + *e* sin(2h)
+    **h** will fit :math:`f(\bf{p}) = a + b \cos(h) + c \cos(2h) + d \sin(h) + e \sin(2h)`
     (magnetic heading correction); *h* is heading at crossover; records must contain headings h1, h2, COE, ID1, ID2.
 
-    **s** will fit f(**p**) = *a* \* z (a unit scale
+    **s** will fit :math:`f(\bf{p}) = a  z` (a unit scale
     correction); *z* is the data value at the crossover; records must contain z1, z2, ID1, ID2.
 
-    **t** will fit f(**p**) = *a* + *b* \* (*t - t0*)
-    (linear drift; *t - t0* is the time along the track since start of track at *t0*); records must
+    **t** will fit :math:`f(\bf{p}) = a + b  (t - t_0)`
+    (linear drift; :math:`t - t_0` is the time along the track since start of track at :math:`t_0`); records must
     contain t1-t0, t2-t0, COE, D1, ID2.
 
-    **z** will fit f(**p**) = *a* + *b* \* z (an offset plus a unit scale
+    **z** will fit :math:`f(\bf{p}) = a + b z` (an offset plus a unit scale
     correction); *z* is the data value at the crossover; records must contain z1, z2, ID1, ID2.
 
 

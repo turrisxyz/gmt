@@ -56,7 +56,7 @@ Required Arguments
     The file describing the horizontal contours of the bodies.  Contours will be
     automatically closed if not already closed, and repeated vertices will be eliminated.
     The segment header for each slice will be examined for the pair *zlevel rho*, i.e.,
-    the depth level of the slice and a density contrast in kg/m^3; see **-D** for overriding this value.
+    the depth level of the slice and a density contrast in kg/m:math:`^3`; see **-D** for overriding this value.
 
 .. _-I:
 
@@ -78,7 +78,7 @@ Optional Arguments
 .. _-D:
 
 **-D**\ *unit*
-    Sets a fixed density contrast that overrides any individual slice settings in the model file, in kg/m^3.
+    Sets a fixed density contrast that overrides any individual slice settings in the model file, in kg/m:math:`^3`.
 
 .. _-F:
 
@@ -154,7 +154,7 @@ Examples
 --------
 
 To compute the free-air anomalies on a grid over a 3-D body that has been contoured
-and saved to body3d.txt, using 1700 kg/m^3 as the fixed density contrast, with
+and saved to body3d.txt, using 1700 kg/m:math:`^3` as the fixed density contrast, with
 horizontal distances in km and vertical distances in meters, try
 
 ::

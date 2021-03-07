@@ -220,8 +220,8 @@ Here, the residual_pacific.nc grid will have the same 5 minute
 resolution as the original.
 
 To filter the dataset in ripples.nc using a custom anisotropic Gaussian
-filter exp (-0.5\*r^2) whose distances r from the center is given by
-(2x^2 + y^2 -2xy)/6, with major axis at an angle of 63 degrees with the
+filter :math:`\exp{-0.5 r^2} whose distances *r* from the center is given by
+:math:`(2x^2 + y^2 -2xy)/6`, with major axis at an angle of 63 degrees with the
 horizontal, try
 
    ::

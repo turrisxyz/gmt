@@ -86,7 +86,7 @@ Optional Arguments
     If *weight.nc* exists, it will be read and used to solve a weighted
     least-squares problem. [Default: Ordinary least-squares fit]. Append
     **+s** to instead read data uncertainties (one sigma) and create weights
-    as 1/sigma^2.  If the robust option has been selected, the weights used
+    as :math:`1/\sigma^2`.  If the robust option has been selected, the weights used
     in the robust fit will be written to *weight.nc*.
 
 .. include:: explain_help.rst_

@@ -115,7 +115,7 @@ Examples
 
 .. include:: explain_example.rst_
 
-To determine area (in km^2), volume (in km^3), and mean height (in km) of all land areas
+To determine area (in km:math:`^2`), volume (in km:math:`^3`), and mean height (in km) of all land areas
 (above zero contour) in the Hawaiian Islands from the remote grid @earth_relief_05m (height in m), use::
 
     gmt grdvolume @earth_relief_05m -R190/210/15/25 -C0 -Sk -Z0.001
@@ -164,7 +164,7 @@ Notes
 #. For geographical grids we convert degrees to "Flat Earth" distances in
    meter.  You can use **-S** to select another distance unit.  The
    area is then reported in this unit squared while the volume is reported
-   in unit^2 * z_unit quantities.
+   in unit:math:`^2 \times` z_unit quantities.
 #. **grdvolume** distinguishes between gridline and pixel-registered grids.
    In both cases the area and volume are computed up to the grid
    boundaries. That means that in the first case the grid cells on the
