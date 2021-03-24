@@ -21,6 +21,7 @@ Synopsis (begin mode)
 |-F|\ [**f**\|\ **s**]\ *width*\ /*height*\ [**+f**\ *wfracs*\ /*hfracs*][**+c**\ *dx/dy*][**+g**\ *fill*][**+p**\ *pen*][**+w**\ *pen*]
 [ |-A|\ *autolabel* ]
 [ |-C|\ [*side*]\ *clearance* ]
+[ |-D| ]
 [ |SYN_OPT-B| ]
 [ |-J|\ *parameters* ]
 [ |-M|\ *margins* ]
@@ -105,8 +106,10 @@ Optional Arguments (begin mode)
     Append **+v** to increase tag numbers vertically down columns [horizontally across rows].
 
 .. _-B:
-
+.. |Add_-B| replace:: |Add_-B_links|
 .. include:: explain_-B.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 .. _-C:
 
@@ -118,6 +121,16 @@ Optional Arguments (begin mode)
     be accessed by modules that plot scales, bars, text, etc.  Settings specified under **begin** directive apply
     to all subplots, while settings under **set** only apply to the selected (active) subplot.  **Note**: Common options **-X**
     and **-Y** are not available during subplots; use **-C** instead.
+
+.. _-D:
+
+**-D**
+    Use the prevailing defaults settings (via gmt.conf or **--PAR**\ =\ *value*) and the selections made
+    via **-B**, **-C**, **-M** and **-S** to determine the panel sizes (if using **-Ff**) and panel spacings only, but
+    do *not* draw and annotate any frames.  This option is useful if you wish to lay down a partial subplot
+    with annotations and frames, but then want to plot data inside it separately later without redrawing
+    the frames.  With different **-B**, **-C**, **-M** and **-S** choices the two subplots may not align, but with
+    **-D** they will.  **Note**: It is assumed that **-F** stays the same [Draw and annotate frames as indicated].
 
 .. _-J:
 
@@ -136,9 +149,11 @@ Optional Arguments (begin mode)
     half the primary annotation font size, giving the full annotation font size as the default gap].
 
 .. _-R:
-
-.. |Add_-R| replace:: This is useful when all subplots share a common plot domain. In this module, the chosen region will also become the default for any data region needed by computational modules.
+.. |Add_-R| replace:: This is useful when all subplots share a common plot domain. In this module, the chosen region
+    will also become the default for any data region needed by computational modules. |Add_-R_links|
 .. include:: explain_-R.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 .. _-S:
 
@@ -202,7 +217,8 @@ Optional Arguments (set mode)
 **-A**\ *fixedlabel*
     Overrides the automatic labeling with the given string.  No modifiers are allowed.
     Placement, justification, etc. are all inherited from how **-A** was specified by the
-    initial **subplot begin** command.
+    initial **subplot begin** command.  **Note**: Overriding means you initiate the tag
+    machinery with **-A** when **subplot begin** was called, otherwise the option is ignored.
 
 .. _subplot_set-C2:
 
@@ -250,7 +266,7 @@ Examples
 To make a minimalistic 2x2 basemap layout called panels.pdf, try::
 
     gmt begin panels pdf
-      gmt subplot begin 2x2 -Fs8c -M5p -A -SCb -SRl -Bwstr -R0/80/0/10
+      gmt subplot begin 2x2 -Fs8c -M5p -A -SCb -SRl -R0/80/0/10
         gmt subplot set
         gmt basemap
         gmt subplot set

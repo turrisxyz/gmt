@@ -69,7 +69,7 @@ EXTERN_MSC int gmt_get_option_id (int start, char *this_option);
 EXTERN_MSC bool gmt_is_integer (char *L);
 EXTERN_MSC int gmt_get_next_panel (struct GMTAPI_CTRL *API, int fig, int *row, int *col);
 EXTERN_MSC int gmt_report_usage (struct GMTAPI_CTRL *API, struct GMT_OPTION *options, unsigned int special, int (*usage)(struct GMTAPI_CTRL *, int));
-EXTERN_MSC void gmt_auto_offsets_for_colorbar (struct GMT_CTRL *GMT, double offset[], int justify);
+EXTERN_MSC void gmt_auto_offsets_for_colorbar (struct GMT_CTRL *GMT, double offset[], int justify, struct GMT_OPTION *options);
 EXTERN_MSC struct GMT_SUBPLOT * gmt_subplot_info (struct GMTAPI_CTRL *API, int fig);
 EXTERN_MSC int gmt_get_V (char arg);
 EXTERN_MSC char gmt_set_V (int mode);
@@ -288,6 +288,8 @@ EXTERN_MSC int gmt_set_psfilename (struct GMT_CTRL *GMT);
 
 /* gmt_io.c: */
 
+EXTERN_MSC void gmt_check_abstime_format (struct GMT_CTRL *GMT, struct GMT_DATASET *D, uint64_t chunk);
+EXTERN_MSC int gmt_get_precision_width (struct GMT_CTRL *GMT, double x);
 EXTERN_MSC int gmt_convert_double (struct GMT_CTRL *GMT, char *text, double *value);
 EXTERN_MSC void gmt_increase_abstime_format_precision (struct GMT_CTRL *GMT, unsigned int col, double dt);
 EXTERN_MSC char *gmt_get_filename (struct GMTAPI_CTRL *API, const char* filename, const char *mods);
