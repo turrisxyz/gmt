@@ -400,10 +400,28 @@ GMT_LOCAL struct GMT_DATASEGMENT * pssolar_get_polygon (struct GMT_CTRL *GMT, do
 	struct GMT_DATASEGMENT *S = gmt_get_smallcircle (GMT, lon, lat, radius, n);
 	double *clon = NULL, *clat = NULL;
 	unsigned int check = 0;
-	uint64_t n_new;
+	uint64_t n_new, k, j = 0;
+	bool prev, next;
 
 	if (GMT->current.map.is_world) return (S);
 	/* Here we wish to clip the polygon */
+	clon = gmt_M_memory (GMT, NULL, n, double);
+	clat = gmt_M_memory (GMT, NULL, n, double);
+	prev = GMT->current.map.outside (GMT, S->data[GMT_X][0], S->data[GMT_Y][0]);
+	for (k = 1; k < n; k++) {
+		next = GMT->current.map.outside (GMT, S->data[GMT_X][k], S->data[GMT_Y][k]);
+		if (prev && !next) {	/* Entering region - need previous point for crossing */
+			clon[j] = S->data[GMT_X][k-1];	clat[j] = S->data[GMT_Y][k-1];	j++;
+		}
+		if (!next) {	/* Always add inside point */
+			clon[j] = S->data[GMT_X][k];	clat[j] = S->data[GMT_Y][k];	j++;
+		}
+		else if (next && !prev) {	/* Exiting region - need to place first outside point for crossing */
+			clon[j] = S->data[GMT_X][k];	clat[j] = S->data[GMT_Y][k];	j++;
+		}
+		prev = next;
+	}
+
 	gmt_set_inside_mode (GMT, NULL, GMT_IOO_SPHERICAL);
 	if (GMT->common.R.oblique) {	/* Must handle things in the rectangular projected coordinate system */
 		double X, Y;
@@ -424,7 +442,6 @@ GMT_LOCAL struct GMT_DATASEGMENT * pssolar_get_polygon (struct GMT_CTRL *GMT, do
 		GMT->current.proj.corner[3] = gmt_inonout (GMT, GMT->common.R.wesn[XLO], GMT->common.R.wesn[YHI], S);		
 		check = GMT->current.proj.corner[0] + GMT->current.proj.corner[1] + GMT->current.proj.corner[2] + GMT->current.proj.corner[3];
 	}
-	n_new = gmt_clip_to_map (GMT, S->data[GMT_X], S->data[GMT_Y], S->n_rows, &clon, &clat);
 	return (S);
 }
 
