@@ -396,6 +396,38 @@ GMT_LOCAL int pssolar_params (struct PSSOLAR_CTRL *Ctrl, struct SUN_PARAMS *Sun)
 	return (GMT_NOERROR);
 }
 
+GMT_LOCAL struct GMT_DATASEGMENT * pssolar_get_polygon (struct GMT_CTRL *GMT, double lon, double lat, double radius, unsigned int n) {
+	struct GMT_DATASEGMENT *S = gmt_get_smallcircle (GMT, lon, lat, radius, n);
+	double *clon = NULL, *clat = NULL;
+	unsigned int check = 0;
+	uint64_t n_new;
+
+	if (GMT->current.map.is_world) return (S);
+	/* Here we wish to clip the polygon */
+	gmt_set_inside_mode (GMT, NULL, GMT_IOO_SPHERICAL);
+	if (GMT->common.R.oblique) {	/* Must handle things in the rectangular projected coordinate system */
+		double X, Y;
+		gmt_xy_to_geo (GMT, &X, &Y, GMT->current.proj.rect[XLO], GMT->current.proj.rect[YLO]);
+		GMT->current.proj.corner[0] = gmt_inonout (GMT, X, Y, S);
+		gmt_xy_to_geo (GMT, &X, &Y, GMT->current.proj.rect[XHI], GMT->current.proj.rect[YLO]);
+		GMT->current.proj.corner[1] = gmt_inonout (GMT, X, Y, S);
+		gmt_xy_to_geo (GMT, &X, &Y, GMT->current.proj.rect[XHI], GMT->current.proj.rect[YHI]);
+		GMT->current.proj.corner[2] = gmt_inonout (GMT, X, Y, S);
+		gmt_xy_to_geo (GMT, &X, &Y, GMT->current.proj.rect[XLO], GMT->current.proj.rect[YHI]);
+		GMT->current.proj.corner[3] = gmt_inonout (GMT, X, Y, S);
+		check = GMT->current.proj.corner[0] + GMT->current.proj.corner[1] + GMT->current.proj.corner[2] + GMT->current.proj.corner[3];
+	}
+	else {	/* Meridians and parallels form the map boundary */
+		GMT->current.proj.corner[0] = gmt_inonout (GMT, GMT->common.R.wesn[XLO], GMT->common.R.wesn[YLO], S);
+		GMT->current.proj.corner[1] = gmt_inonout (GMT, GMT->common.R.wesn[XHI], GMT->common.R.wesn[YLO], S);
+		GMT->current.proj.corner[2] = gmt_inonout (GMT, GMT->common.R.wesn[XHI], GMT->common.R.wesn[YHI], S);
+		GMT->current.proj.corner[3] = gmt_inonout (GMT, GMT->common.R.wesn[XLO], GMT->common.R.wesn[YHI], S);		
+		check = GMT->current.proj.corner[0] + GMT->current.proj.corner[1] + GMT->current.proj.corner[2] + GMT->current.proj.corner[3];
+	}
+	n_new = gmt_clip_to_map (GMT, S->data[GMT_X], S->data[GMT_Y], S->n_rows, &clon, &clat);
+	return (S);
+}
+
 /* --------------------------------------------------------------------------------------------------- */
 EXTERN_MSC int GMT_pssolar (void *V_API, int mode, void *args) {
 	int     j, n, hour, min, error = 0;
@@ -567,7 +599,7 @@ EXTERN_MSC int GMT_pssolar (void *V_API, int mode, void *args) {
 			if (Ctrl->T.radius[n] == 0) continue;	/* This terminator was not requested */
 			Ctrl->T.which = n;
 			pssolar_params (Ctrl, Sun);
-			S = gmt_get_smallcircle (GMT, -Sun->HourAngle, Sun->SolarDec, Sun->radius, n_pts);
+			S = pssolar_get_polygon (GMT, -Sun->HourAngle, Sun->SolarDec, Sun->radius, n_pts);
 			if (Ctrl->G.clip) {	/* Set up a clip path */
 				bool must_free = true;
 				if ((n_pts = (int)gmt_geo_polarcap_segment (GMT, S, &lon, &lat)) == 0) {	/* No resampling took place */
