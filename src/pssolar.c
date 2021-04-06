@@ -410,7 +410,7 @@ GMT_LOCAL struct GMT_DATASEGMENT ** pssolar_split_polygon (struct GMT_CTRL *GMT,
 	S = D->table[0]->segment[0];
 	for (k = 0; k < In->n_rows; k++) {
 		S->data[GMT_Y][k] = In->data[GMT_Y][k];
-		S->data[GMT_X][k] = (In->data[GMT_Y][k] >= 0.0) ? 0.0 : In->data[GMT_X][k];
+		S->data[GMT_X][k] = (In->data[GMT_X][k] >= 0.0) ? 0.0 : In->data[GMT_X][k];
 	}
 
 	/* Build E */
@@ -618,7 +618,7 @@ EXTERN_MSC int GMT_pssolar (void *V_API, int mode, void *args) {
 					struct GMT_DATASEGMENT **P = pssolar_split_polygon (GMT, S);
 					gmt_setfill (GMT, &Ctrl->G.fill, false);
 					gmt_geo_polygons (GMT, P[0]);
-					gmt_geo_polygons (GMT, P[1]);
+					//gmt_geo_polygons (GMT, P[1]);
 					if (Ctrl->W.active) {
 						gmt_setpen (GMT, &Ctrl->W.pen);
 						gmt_geo_polygons (GMT, S);
