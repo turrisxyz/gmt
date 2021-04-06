@@ -396,6 +396,33 @@ GMT_LOCAL int pssolar_params (struct PSSOLAR_CTRL *Ctrl, struct SUN_PARAMS *Sun)
 	return (GMT_NOERROR);
 }
 
+GMT_LOCAL struct GMT_DATASEGMENT ** pssolar_split_polygon (struct GMT_CTRL *GMT, struct GMT_DATASEGMENT *In) {
+	struct GMT_DATASET *D = NULL;
+	struct GMT_DATASEGMENT *S = NULL;
+	unsigned int k;
+	uint64_t dim[4] = {1, 2, In->n_rows, 2};
+
+	if ((D = GMT_Create_Data (GMT->parent, GMT_IS_DATASET, GMT_IS_POLYGON, 0, dim, NULL, NULL, 0, 0, NULL)) == NULL) {
+		return NULL;
+	}
+
+	/* Build W */
+	S = D->table[0]->segment[0];
+	for (k = 0; k < In->n_rows; k++) {
+		S->data[GMT_Y][k] = In->data[GMT_Y][k];
+		S->data[GMT_X][k] = (In->data[GMT_Y][k] >= 0.0) ? 0.0 : In->data[GMT_X][k];
+	}
+
+	/* Build E */
+	S = D->table[0]->segment[1];
+	for (k = 0; k < In->n_rows; k++) {
+		S->data[GMT_Y][k] = In->data[GMT_Y][k];
+		S->data[GMT_X][k] = (In->data[GMT_X][k] <= 0.0) ? 0.0 : In->data[GMT_X][k];
+	}
+
+	return (D->table[0]->segment);
+}
+
 /* --------------------------------------------------------------------------------------------------- */
 EXTERN_MSC int GMT_pssolar (void *V_API, int mode, void *args) {
 	int     j, n, hour, min, error = 0;
@@ -587,11 +614,23 @@ EXTERN_MSC int GMT_pssolar (void *V_API, int mode, void *args) {
 				}
 			}
 			else {
-				if (Ctrl->W.active)
+				if (Ctrl->G.active) {	/* Must split */
+					struct GMT_DATASEGMENT **P = pssolar_split_polygon (GMT, S);
+					gmt_setfill (GMT, &Ctrl->G.fill, false);
+					gmt_geo_polygons (GMT, P[0]);
+					gmt_geo_polygons (GMT, P[1]);
+					if (Ctrl->W.active) {
+						gmt_setpen (GMT, &Ctrl->W.pen);
+						gmt_geo_polygons (GMT, S);
+					}
+				}
+				else {
+					struct GMT_FILL no_fill;
+					gmt_init_fill (GMT, &no_fill, -1.0, -1.0, -1.0);
 					gmt_setpen (GMT, &Ctrl->W.pen);
-				if (Ctrl->G.active)
-					gmt_setfill (GMT, &Ctrl->G.fill, Ctrl->W.active);
-				gmt_geo_polygons (GMT, S);
+					gmt_setfill (GMT, &no_fill, true);
+					gmt_geo_polygons (GMT, S);
+				}
 			}
 			gmt_free_segment (GMT, &S);
 		}
