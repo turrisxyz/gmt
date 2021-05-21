@@ -19,25 +19,32 @@ elif [ $(which cmake) = "/opt/homebrew/bin/cmake" ]; then
 	distro=HomeBrew
 	top=/opt/homebrew
 else
-	distro=Fink
-	/sw
+	echo "Requires MacPorts or HomeBrew, sorry"
+	exit 1
 fi
 
 # Set temporary directory
 TMPDIR=${TMPDIR:-/tmp}
 
-# 1a. List of executables needed and whose shared libraries also are needed.
-#     Use full path if you need something not in your path
-EXEPLUSLIBS="${top}/bin/gsc ${top}/bin/gm ${top}/bin/ffmpeg ${top}/bin/ogr2ogr ${top}/bin/gdal_translate ${top}/lib/libfftw3f_threads.dylib"
-# 1b. List of any symbolic links needed
-#     Use full path if you need something not in your path
-EXELINKS=${top}/bin/gs
-# 1c. List of executables whose shared libraries have already been included via other shared libraries
-#     Use full path if you need something not in your path
-EXEONLY=
-# 1d. Shared directories to be added
-#     Use full path if you need something not in your path
-EXESHARED="gdal ${top}/share/ghostscript ${top}/lib/proj7/share/proj"
+if [ "Distro" = "MacPorts" ]; then
+	# 1a. List of executables needed and whose shared libraries also are needed.
+	#     Use full path if you need something not in your path
+	EXEPLUSLIBS="${top}/bin/gsc ${top}/bin/gm ${top}/bin/ffmpeg ${top}/bin/ogr2ogr ${top}/bin/gdal_translate ${top}/lib/libfftw3f_threads.dylib"
+	# 1b. List of any symbolic links needed
+	#     Use full path if you need something not in your path
+	EXELINKS=${top}/bin/gs
+	# 1c. List of executables whose shared libraries have already been included via other shared libraries
+	#     Use full path if you need something not in your path
+	EXEONLY=
+	# 1d. Shared directories to be added
+	#     Use full path if you need something not in your path
+	EXESHARED="gdal ${top}/share/ghostscript ${top}/lib/proj7/share/proj"
+else
+	EXEPLUSLIBS="${top}/bin/gsc ${top}/bin/gm ${top}/bin/ffmpeg ${top}/bin/ogr2ogr ${top}/bin/gdal_translate"
+	EXELINKS=${top}/bin/gs ${top}/lib/libfftw3f_threads.dylib
+	EXEONLY=
+	EXESHARED="gdal ${top}/share/ghostscript ${top}/lib/share/proj"
+fi
 #-----------------------------------------
 # 2a. Add the executables to the list given their paths
 rm -f ${TMPDIR}/raw.lis
