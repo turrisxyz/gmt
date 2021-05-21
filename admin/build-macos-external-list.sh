@@ -39,11 +39,13 @@ if [ "Distro" = "MacPorts" ]; then
 	# 1d. Shared directories to be added
 	#     Use full path if you need something not in your path
 	EXESHARED="gdal ${top}/share/ghostscript ${top}/lib/proj7/share/proj"
+	GM_CONFIG=${top}/lib/GraphicsMagick-\${GMT_CONFIG_GM_VERSION}/config
 else
-	EXEPLUSLIBS="${top}/bin/gsc ${top}/bin/gm ${top}/bin/ffmpeg ${top}/bin/ogr2ogr ${top}/bin/gdal_translate"
-	EXELINKS=${top}/bin/gs ${top}/lib/libfftw3f_threads.dylib
+	EXEPLUSLIBS="${top}/bin/gsc ${top}/bin/gs ${top}/bin/gm ${top}/bin/ffmpeg ${top}/bin/ogr2ogr ${top}/bin/gdal_translate {top}/lib/libfftw3f_threads.dylib"
+	EXELINKS=
 	EXEONLY=
-	EXESHARED="gdal ${top}/share/ghostscript ${top}/lib/share/proj"
+	EXESHARED="gdal ${top}/share/ghostscript ${top}/share/proj"
+	GM_CONFIG=${top}/share/GraphicsMagick/config
 fi
 #-----------------------------------------
 # 2a. Add the executables to the list given their paths
@@ -113,12 +115,12 @@ install (DIRECTORY
 
 # Place the GraphicsMagick config files
 install (DIRECTORY
-	${top}/lib/GraphicsMagick-\${GMT_CONFIG_GM_VERSION}/config
+	${GM_CONFIG}
 	DESTINATION \${GMT_LIBDIR}/GraphicsMagick
 	COMPONENT Runtime)
 
 install (FILES
-	${top}/share/GraphicsMagick-\${GMT_CONFIG_GM_VERSION}/config/log.mgk
+	${GM_CONFIG}/log.mgk
 	DESTINATION \${GMT_LIBDIR}/GraphicsMagick/config
 	COMPONENT Runtime)
 EOF
