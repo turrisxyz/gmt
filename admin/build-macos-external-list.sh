@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -xv
 #
 # Note: Requires coreutils to be installed so grealpath is available
 #
@@ -15,9 +15,9 @@
 if [ $(which cmake) = "/opt/local/bin/cmake" ]; then
 	distro=MacPorts
 	top=/opt/local
-elif [ $(which cmake) = "/usr/local/bin/cmake" ]; then
+elif [ $(which cmake) = "/opt/homebrew/bin/cmake" ]; then
 	distro=HomeBrew
-	top=/usr/local
+	top=/opt/homebrew
 else
 	distro=Fink
 	/sw
@@ -28,16 +28,16 @@ TMPDIR=${TMPDIR:-/tmp}
 
 # 1a. List of executables needed and whose shared libraries also are needed.
 #     Use full path if you need something not in your path
-EXEPLUSLIBS="/opt/local/bin/gsc /opt/local/bin/gm /opt/local/bin/ffmpeg /opt/local/bin/ogr2ogr /opt/local/bin/gdal_translate /opt/local/lib/libfftw3f_threads.dylib"
+EXEPLUSLIBS="${top}/bin/gsc ${top}/bin/gm ${top}/bin/ffmpeg ${top}/bin/ogr2ogr ${top}/bin/gdal_translate ${top}/lib/libfftw3f_threads.dylib"
 # 1b. List of any symbolic links needed
 #     Use full path if you need something not in your path
-EXELINKS=/opt/local/bin/gs
+EXELINKS=${top}/bin/gs
 # 1c. List of executables whose shared libraries have already been included via other shared libraries
 #     Use full path if you need something not in your path
 EXEONLY=
 # 1d. Shared directories to be added
 #     Use full path if you need something not in your path
-EXESHARED="gdal /opt/local/share/ghostscript /opt/local/lib/proj7/share/proj"
+EXESHARED="gdal ${top}/share/ghostscript ${top}/lib/proj7/share/proj"
 #-----------------------------------------
 # 2a. Add the executables to the list given their paths
 rm -f ${TMPDIR}/raw.lis
@@ -106,12 +106,12 @@ install (DIRECTORY
 
 # Place the GraphicsMagick config files
 install (DIRECTORY
-	/opt/local/lib/GraphicsMagick-\${GMT_CONFIG_GM_VERSION}/config
+	${top}/lib/GraphicsMagick-\${GMT_CONFIG_GM_VERSION}/config
 	DESTINATION \${GMT_LIBDIR}/GraphicsMagick
 	COMPONENT Runtime)
 
 install (FILES
-	/opt/local/share/GraphicsMagick-\${GMT_CONFIG_GM_VERSION}/config/log.mgk
+	${top}/share/GraphicsMagick-\${GMT_CONFIG_GM_VERSION}/config/log.mgk
 	DESTINATION \${GMT_LIBDIR}/GraphicsMagick/config
 	COMPONENT Runtime)
 EOF

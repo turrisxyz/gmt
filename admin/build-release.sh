@@ -36,6 +36,8 @@ abort_build() {	# Called when we abort this script via Crtl-C
 }
 
 TOPDIR=$(pwd)
+chip=$(uname -m)
+
 if [ "${USER}" = "pwessel" ] || [ "${USER}" = "meghanj" ]; then	# Set ftp default action
 	do_ftp=1
 else
@@ -65,7 +67,7 @@ if [ ! -d admin ]; then
 fi
 
 # pngquant is need to optimize images
-if ! [ -x "$(command -v gmt)" ]; then
+if ! [ -x "$(command -v pngquant)" ]; then
 	echo 'build-release.sh: Error: pngquant is not found in your search PATH.' >&2
 	exit 1
 fi
@@ -82,22 +84,24 @@ if ! [ -x "$(command -v grealpath)" ]; then
 	exit 1
 fi
 
-# gnutar is need to build the tarballs
-if ! [ -x "$(command -v gnutar)" ]; then
+# gnutar or gtar is need to build the tarballs
+if ! [ -x "$(command -v gnutar)" ] && ! [ -x "$(command -v gtar)" ]; then
 	echo 'build-release.sh: Error: gnutar is not found in your search PATH.' >&2
 	exit 1
 fi
 
-# gcc-mp-9 is need to build with OpenMP
-if ! [ -x "$(command -v gcc-mp-9)" ]; then
-	echo 'build-release.sh: Error: gcc-mp-9 is not found in your search PATH.' >&2
-	exit 1
-fi
+if ! [ "$chip" = "arm64" ]; then
+	# gcc-mp-9 is need to build with OpenMP for Intel chips
+	if ! [ -x "$(command -v gcc-mp-9)" ]; then
+		echo 'build-release.sh: Error: gcc-mp-9 is not found in your search PATH.' >&2
+		exit 1
+	fi
 
-# gcc-mp-9 is need to build with OpenMP
-if ! [ -x "$(command -v g++-mp-9)" ]; then
-	echo 'build-release.sh: Error: g++-mp-9 is not found in your search PATH.' >&2
-	exit 1
+	# gcc-mp-9 is need to build with OpenMP
+	if ! [ -x "$(command -v g++-mp-9)" ]; then
+		echo 'build-release.sh: Error: g++-mp-9 is not found in your search PATH.' >&2
+		exit 1
+	fi
 fi
 
 # 0. Make sure GMT_GSHHG_SOURCE and GMT_DCW_SOURCE are set in the environment
@@ -137,23 +141,25 @@ mkdir build
 # 2b. Build list of external programs and shared libraries
 admin/build-macos-external-list.sh > build/add_macOS_cpack.txt
 cd build
-# 2c. Set CMake cache for MP build:
-COMPC=$(which gcc-mp-9)
-COMPG=$(which g++-mp-9)
-cat << EOF > cache-mp-gcc.cmake
-# Cache settings for building the macOS release with GCC and OpenMP
-# This cache file is set for the binary paths of macports
-#
-SET ( CMAKE_C_COMPILER "${COMPC}" CACHE STRING "GNU MP C compiler" )
-SET ( CMAKE_CXX_COMPILER "${COMPG}" CACHE STRING "GNU MP C++ compiler" )
-SET ( CMAKE_C_FLAGS -flax-vector-conversions CACHE STRING "C FLAGS")
-SET ( CMAKE_C_FLAGS_DEBUG -flax-vector-conversions CACHE STRING "C FLAGS DEBUG")
-SET ( CMAKE_C_FLAGS_RELEASE -flax-vector-conversions CACHE STRING "C FLAGS RELEASE")
-SET ( OpenMP_C_FLAGS -flax-vector-conversions CACHE STRING "C FLAGS OPENMP")
-EOF
-
 echo "build-release.sh: Configure and build tarballs" >&2
-cmake -G Ninja  -C cache-mp-gcc.cmake ..
+if [ "$chip" = "arm64" ]; then
+	cmake -G Ninja ..
+else # 2c. Set CMake cache for MP build:
+	COMPC=$(which gcc-mp-9)
+	COMPG=$(which g++-mp-9)
+	cat <<- EOF > cache-mp-gcc.cmake
+	# Cache settings for building the macOS release with GCC and OpenMP
+	# This cache file is set for the binary paths of macports
+	#
+	SET ( CMAKE_C_COMPILER "${COMPC}" CACHE STRING "GNU MP C compiler" )
+	SET ( CMAKE_CXX_COMPILER "${COMPG}" CACHE STRING "GNU MP C++ compiler" )
+	SET ( CMAKE_C_FLAGS -flax-vector-conversions CACHE STRING "C FLAGS")
+	SET ( CMAKE_C_FLAGS_DEBUG -flax-vector-conversions CACHE STRING "C FLAGS DEBUG")
+	SET ( CMAKE_C_FLAGS_RELEASE -flax-vector-conversions CACHE STRING "C FLAGS RELEASE")
+	SET ( OpenMP_C_FLAGS -flax-vector-conversions CACHE STRING "C FLAGS OPENMP")
+	EOF
+	cmake -G Ninja  -C cache-mp-gcc.cmake ..
+fi
 # 3. Build the release and the tarballs
 cmake --build . --target gmt_release
 cmake --build . --target gmt_release_tar
