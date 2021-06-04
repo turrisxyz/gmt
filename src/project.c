@@ -905,9 +905,8 @@ EXTERN_MSC int GMT_project (void *V_API, int mode, void *args) {
 		P.output_choice[1] = 5;
 		P.output_choice[2] = 2;
 		if (Ctrl->Z.active) {	/* Do the full ellipse */
-			double h = pow (Ctrl->Z.major - Ctrl->Z.minor, 2.0) / pow (Ctrl->Z.major + Ctrl->Z.minor, 2.0);
 			Ctrl->L.min = 0.0;
-			Ctrl->L.max = M_PI * (Ctrl->Z.major + Ctrl->Z.minor) * (1.0 + (3.0 * h)/(10.0 + sqrt (4.0 - 3.0 * h)));	/* Ramanujan approximation of ellipse circumference */
+			Ctrl->L.max = gmt_ellipse_circumference (GMT, Ctrl->Z.major,Ctrl->Z.minor);
 			if (Ctrl->Z.number)	/* Want a specific number of points */
 				Ctrl->G.inc = Ctrl->L.max / rint (Ctrl->G.inc);
 			else if (Ctrl->Z.exact) {	/* Adjust inc to fit the ellipse perimeter exactly */

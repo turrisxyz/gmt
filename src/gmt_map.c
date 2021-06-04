@@ -9893,7 +9893,7 @@ GMT_LOCAL void gmtmap_ellipse_point (struct GMT_CTRL *GMT, double lon, double la
 
 #define GMT_ELLIPSE_APPROX 72
 
-struct GMT_DATASEGMENT * gmt_get_geo_ellipse (struct GMT_CTRL *GMT, double lon, double lat, double major_km, double minor_km, double azimuth, uint64_t m) {
+struct GMT_DATASEGMENT * gmt_get_geo_ellipse_old (struct GMT_CTRL *GMT, double lon, double lat, double major_km, double minor_km, double azimuth, uint64_t m) {
 	/* gmt_get_geo_ellipse takes the location, axes (in km), and azimuth of the ellipse's major axis
 	   and computes coordinates for an approximate ellipse using N-sided polygon.
 	   If m > 0 then we l\set N = m and use that many points.  Otherwise (m == 0), we will
@@ -9941,6 +9941,89 @@ struct GMT_DATASEGMENT * gmt_get_geo_ellipse (struct GMT_CTRL *GMT, double lon, 
 		snprintf (header, GMT_LEN256, "Circle around %g/%g with diameter %g km approximated by %" PRIu64 " points", lon, lat, major_km, N);
 	else
 		snprintf (header, GMT_LEN256, "Ellipse around %g/%g with major/minor axes %g/%g km and major axis azimuth %g approximated by %" PRIu64 " points", lon, lat, major_km, minor_km, azimuth, N);
+	S->header = strdup (header);
+	return (S);
+}
+
+double gmt_ellipse_circumference (struct GMT_CTRL *GMT, double major, double minor) {
+	double h = pow (major - minor, 2.0) / pow (major + minor, 2.0);
+	double C = M_PI * (major + minor) * (1.0 + (3.0 * h)/(10.0 + sqrt (4.0 - 3.0 * h)));	/* Ramanujan approximation of ellipse circumference from semi-major/minor xes*/
+	return (C);
+}
+
+struct GMT_DATASEGMENT * gmt_get_geo_ellipse (struct GMT_CTRL *GMT, double lon, double lat, double major_km, double minor_km, double azimuth, uint64_t m) {
+	/* Using ideas posted on https://math.stackexchange.com/questions/903368/ellipse-like-on-sphere */
+	bool is_ellipse = !doubleAlmostEqual (major_km, minor_km);	/* If the same then we have a circle, i.e., a degenerate ellipse */
+	uint64_t i, N;
+	double theta, alpha, delta_azimuth, a, b, s, c, A, D, w, R[3][3], X[3], O[3], P[3], V[3];
+	double *px = NULL, *py = NULL;
+	char header[GMT_LEN256] = {""};
+	struct GMT_DATASEGMENT *S = NULL;
+
+	theta = 0.5 * D2R * major_km / GMT->current.proj.DIST_KM_PR_DEG;	/* major semi-axis in radians */
+	alpha = 0.5 * D2R * sqrt (major_km*major_km - minor_km*minor_km) / GMT->current.proj.DIST_KM_PR_DEG;	/* Dist from center to focal point */
+	A = tan (alpha);	D = fabs (tan (theta));
+	a = R2D * D / sqrt (1.0 + D*D);	b = R2D * sqrt ((D*D - A*A)/(1.0 + D*D));	/* Now standard form is (x/a)^2 + (y/b)^2 = 1 (in degrees) */
+	if (m == 0) {	/* Determine N, assumes a projection is in effect */
+		if (GMT->current.proj.projection_GMT == 0 || GMT->current.proj.projection == GMT_NO_PROJ) {
+			N = GMT_ELLIPSE_APPROX;
+			GMT_Report (GMT->parent, GMT_MSG_WARNING, "No projection in effect needed to estimate pints needed for ellipse, assuming %" PRIu64 "\n", N);
+		}
+		else {	/* Here we use approximate spacing to determine how many points are needed */
+			double axx, ayy, bx, by, bxx, byy, L;
+			delta_azimuth = 2.0 * M_PI / GMT_ELLIPSE_APPROX;	/* Initial guess of angular spacing */
+			gmt_geo_to_xy (GMT, a, 0.0, &axx, &ayy);	/* Projected point 1 */
+			gmt_geo_to_xy (GMT, a * cos (delta_azimuth), b * sin (delta_azimuth), &bxx, &byy);	/* Projected point 2 */
+			L = hypot (axx - bxx, ayy - byy);	/* Plot distance between then in inches */
+			N = MAX (8, (uint64_t) irint (GMT_ELLIPSE_APPROX * L / GMT->current.setting.map_line_step));	/* Adjust N given this information */
+			GMT_Report (GMT->parent, GMT_MSG_DEBUG, "Ellipse will be approximated by %" PRIu64 "-sided polygon\n", N);
+		}
+	}
+	else	/* Approximate ellipse by a m-sided polygon */
+		N = m;
+	delta_azimuth = 2.0 * M_PI / N;	/* Tau spacing */
+	/* Allocate datasegment of the right size */
+	S = GMT_Alloc_Segment (GMT->parent, GMT_NO_STRINGS, N+1, 2, NULL, NULL);
+	px = S->data[GMT_X];	py = S->data[GMT_Y];	/* Short-hands used below */
+
+	/* Now determine translate matrix to move origin to stated center */
+	gmt_geo_to_cart (GMT, 0.0, 0.0, O, true);	/* Origin of initial ellipse */
+	gmt_geo_to_cart (GMT, lat, lon, X, true);	/* Center of desired ellipse */
+	gmt_cross3v (GMT, O, X, P);	/* Get the rotation pole of the translation */
+	gmt_normalize3v (GMT, P);	/* Make it a unit vector */
+	w = acosd (gmt_dot3v (GMT, O, X));	/* Translation angle in degrees */
+	if (is_ellipse) {	/* Must do both translation and rotation to correct azimuth */
+		double lonp, latp, Rt[3][3], Rr[3][3], *pr = (double *)R, az0;
+		gmt_make_rot_matrix2 (GMT, P, w, Rt);	/* Translation matrix */
+		gmt_geo_to_cart (GMT, 0.0, a, V, true);	/* Point on ellipse for zero tau */
+		gmt_matrix_vect_mult (GMT, 3U, Rt, V, P);	/* Do Rt * V = P */
+		gmt_cart_to_geo (GMT, &latp, &lonp, P, true);	/* Get translated and possibly rotated lon/lat at zero tau */
+		/* Determine the azimuth of translated major axes */
+		az0 = gmt_az_backaz (GMT, lon, lat, lonp, latp, false);	/* Current azimuth of ellipse after translation */
+		w = az0 - azimuth;	/* Residual azimuth to correct to yield desired azimuth at desired location */
+		gmt_make_rot_matrix2 (GMT, X, w, Rr);	/* Rotation matrix */
+		gmt_matrix_matrix_mult (GMT, (double *)Rr, (double *)Rt, 3U, 3U, 3U, pr);	/* Combine the two rotations so P = Rr * (Rt * V) = R * V */
+		/* Must take the transpose as we get R' out of gmt_matrix_matrix_mult above */
+		gmt_M_double_swap (R[0][1], R[1][0]);	/* Flip off-diagonal terms */
+		gmt_M_double_swap (R[0][2], R[2][0]);
+		gmt_M_double_swap (R[1][2], R[2][1]);
+	}
+	else	/* Only the translation matrix is needed */
+		gmt_make_rot_matrix2 (GMT, P, w, R);
+	/* Ready to build the original ellipse then rotated it to its final location on the fly */
+	for (i = 0; i < N; i++) {
+		sincos (i * delta_azimuth, &s, &c);	/* Current tau */
+		gmt_geo_to_cart (GMT, b * s, a * c, V, true);	/* Point on ellipse centered on origin */
+		gmt_matrix_vect_mult (GMT, 3U, R, V, P);	/* Do R * V = P */
+		gmt_cart_to_geo (GMT, &(py[i]), &(px[i]), P, true);	/* Get lon/lat on translated/rotated ellipse */
+	}
+	/* Explicitly close the polygon */
+	px[N] = px[0], py[N] = py[0];
+
+	if (is_ellipse)
+		snprintf (header, GMT_LEN256, "Ellipse around %g/%g with major/minor axes %g/%g km and major axis azimuth %g approximated by %" PRIu64 " points", lon, lat, major_km, minor_km, azimuth, N);
+	else
+		snprintf (header, GMT_LEN256, "Circle around %g/%g with diameter %g km approximated by %" PRIu64 " points", lon, lat, major_km, N);
 	S->header = strdup (header);
 	return (S);
 }
