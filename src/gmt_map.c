@@ -9955,15 +9955,18 @@ struct GMT_DATASEGMENT * gmt_get_geo_ellipse (struct GMT_CTRL *GMT, double lon, 
 	/* Using ideas posted on https://math.stackexchange.com/questions/903368/ellipse-like-on-sphere */
 	bool is_ellipse = !doubleAlmostEqual (major_km, minor_km);	/* If the same then we have a circle, i.e., a degenerate ellipse */
 	uint64_t i, N;
-	double theta, alpha, delta_azimuth, a, b, s, c, A, D, w, R[3][3], X[3], O[3], P[3], V[3];
+	double theta, delta_azimuth, a, b, s, c, A = 0.0, D, w, R[3][3], C[3], O[3] = {0.0, 0.0, 1.0}, P[3], V[3];
 	double *px = NULL, *py = NULL;
 	char header[GMT_LEN256] = {""};
 	struct GMT_DATASEGMENT *S = NULL;
 
 	theta = 0.5 * D2R * major_km / GMT->current.proj.DIST_KM_PR_DEG;	/* major semi-axis in radians */
-	alpha = 0.5 * D2R * sqrt (major_km*major_km - minor_km*minor_km) / GMT->current.proj.DIST_KM_PR_DEG;	/* Dist from center to focal point */
-	A = tan (alpha);	D = fabs (tan (theta));
-	a = R2D * D / sqrt (1.0 + D*D);	b = R2D * sqrt ((D*D - A*A)/(1.0 + D*D));	/* Now standard form is (x/a)^2 + (y/b)^2 = 1 (in degrees) */
+	D = fabs (tan (theta));
+	if (is_ellipse) {	/* Get half-distance between focal points */
+		double alpha = 0.5 * D2R * sqrt (major_km*major_km - minor_km*minor_km) / GMT->current.proj.DIST_KM_PR_DEG;
+		A = tan (alpha);
+	}
+	a = D / sqrt (1.0 + D*D);	b = sqrt ((D*D - A*A)/(1.0 + D*D));	/* Now standard form is (x/p)^2 + (y/q)^2 = 1 */
 	if (m == 0) {	/* Determine N, assumes a projection is in effect */
 		if (GMT->current.proj.projection_GMT == 0 || GMT->current.proj.projection == GMT_NO_PROJ) {
 			N = GMT_ELLIPSE_APPROX;
@@ -9972,8 +9975,8 @@ struct GMT_DATASEGMENT * gmt_get_geo_ellipse (struct GMT_CTRL *GMT, double lon, 
 		else {	/* Here we use approximate spacing to determine how many points are needed */
 			double axx, ayy, bx, by, bxx, byy, L;
 			delta_azimuth = 2.0 * M_PI / GMT_ELLIPSE_APPROX;	/* Initial guess of angular spacing */
-			gmt_geo_to_xy (GMT, a, 0.0, &axx, &ayy);	/* Projected point 1 */
-			gmt_geo_to_xy (GMT, a * cos (delta_azimuth), b * sin (delta_azimuth), &bxx, &byy);	/* Projected point 2 */
+			gmt_geo_to_xy (GMT, a * R2D, 0.0, &axx, &ayy);	/* Projected point 1 */
+			gmt_geo_to_xy (GMT, a * R2D * cos (delta_azimuth), b * R2D * sin (delta_azimuth), &bxx, &byy);	/* Projected point 2 */
 			L = hypot (axx - bxx, ayy - byy);	/* Plot distance between then in inches */
 			N = MAX (8, (uint64_t) irint (GMT_ELLIPSE_APPROX * L / GMT->current.setting.map_line_step));	/* Adjust N given this information */
 			GMT_Report (GMT->parent, GMT_MSG_DEBUG, "Ellipse will be approximated by %" PRIu64 "-sided polygon\n", N);
@@ -9987,23 +9990,22 @@ struct GMT_DATASEGMENT * gmt_get_geo_ellipse (struct GMT_CTRL *GMT, double lon, 
 	px = S->data[GMT_X];	py = S->data[GMT_Y];	/* Short-hands used below */
 
 	/* Now determine translate matrix to move origin to stated center */
-	gmt_geo_to_cart (GMT, 0.0, 0.0, O, true);	/* Origin of initial ellipse */
-	gmt_geo_to_cart (GMT, lat, lon, X, true);	/* Center of desired ellipse */
-	gmt_cross3v (GMT, O, X, P);	/* Get the rotation pole of the translation */
-	gmt_normalize3v (GMT, P);	/* Make it a unit vector */
-	w = acosd (gmt_dot3v (GMT, O, X));	/* Translation angle in degrees */
+	gmt_geo_to_cart (GMT, lat, lon, C, true);	/* Center of desired ellipse */
+	gmt_cross3v (GMT, O, C, P);	/* Get the rotation pole of the translation */
+	gmt_normalize3v (GMT, P);	/* Ensure it is a unit vector */
+	w = acosd (gmt_dot3v (GMT, O, C));	/* Translation angle in degrees is always needed */
 	if (is_ellipse) {	/* Must do both translation and rotation to correct azimuth */
-		double lonp, latp, Rt[3][3], Rr[3][3], *pr = (double *)R, az0;
+		double lon_p, lat_p, Rt[3][3], Rr[3][3], azim_major_axis;
 		gmt_make_rot_matrix2 (GMT, P, w, Rt);	/* Translation matrix */
-		gmt_geo_to_cart (GMT, 0.0, a, V, true);	/* Point on ellipse for zero tau */
+		V[GMT_X] = a;	V[GMT_Y] = 0.0;	V[GMT_Z] = sqrt (1.0 - V[GMT_X]*V[GMT_X]);	/* Enforce a unit vector */
 		gmt_matrix_vect_mult (GMT, 3U, Rt, V, P);	/* Do Rt * V = P */
-		gmt_cart_to_geo (GMT, &latp, &lonp, P, true);	/* Get translated and possibly rotated lon/lat at zero tau */
-		/* Determine the azimuth of translated major axes */
-		az0 = gmt_az_backaz (GMT, lon, lat, lonp, latp, false);	/* Current azimuth of ellipse after translation */
-		w = az0 - azimuth;	/* Residual azimuth to correct to yield desired azimuth at desired location */
-		gmt_make_rot_matrix2 (GMT, X, w, Rr);	/* Rotation matrix */
-		gmt_matrix_matrix_mult (GMT, (double *)Rr, (double *)Rt, 3U, 3U, 3U, pr);	/* Combine the two rotations so P = Rr * (Rt * V) = R * V */
-		/* Must take the transpose as we get R' out of gmt_matrix_matrix_mult above */
+		gmt_cart_to_geo (GMT, &lat_p, &lon_p, P, true);	/* Get translated and possibly rotated lon_p/lat_p at zero tau */
+		/* Determine the possibly non-zero azimuth of translated major axes */
+		azim_major_axis = gmt_az_backaz (GMT, lon, lat, lon_p, lat_p, false);	/* Current azimuth of ellipse after translation */
+		w = azim_major_axis - azimuth;	/* Residual azimuth to correct to yield desired azimuth at desired location */
+		gmt_make_rot_matrix2 (GMT, C, w, Rr);	/* Rotation matrix */
+		gmt_matrix_matrix_mult (GMT, (double *)Rr, (double *)Rt, 3U, 3U, 3U, (double *)R);	/* Combine the two rotations so P = Rr * (Rt * V) = R * V */
+		/* Must take the transpose as we get R' out of gmt_matrix_matrix_mult above due to Fortran thinking in LAPACK */
 		gmt_M_double_swap (R[0][1], R[1][0]);	/* Flip off-diagonal terms */
 		gmt_M_double_swap (R[0][2], R[2][0]);
 		gmt_M_double_swap (R[1][2], R[2][1]);
@@ -10013,7 +10015,7 @@ struct GMT_DATASEGMENT * gmt_get_geo_ellipse (struct GMT_CTRL *GMT, double lon, 
 	/* Ready to build the original ellipse then rotated it to its final location on the fly */
 	for (i = 0; i < N; i++) {
 		sincos (i * delta_azimuth, &s, &c);	/* Current tau */
-		gmt_geo_to_cart (GMT, b * s, a * c, V, true);	/* Point on ellipse centered on origin */
+		V[GMT_X] = a * c;	V[GMT_Y] = b * s;	V[GMT_Z] = sqrt (1.0 - V[GMT_X]*V[GMT_X] - V[GMT_Y]*V[GMT_Y]);	/* Enforce a unit vector */
 		gmt_matrix_vect_mult (GMT, 3U, R, V, P);	/* Do R * V = P */
 		gmt_cart_to_geo (GMT, &(py[i]), &(px[i]), P, true);	/* Get lon/lat on translated/rotated ellipse */
 	}
