@@ -9893,61 +9893,10 @@ GMT_LOCAL void gmtmap_ellipse_point (struct GMT_CTRL *GMT, double lon, double la
 
 #define GMT_ELLIPSE_APPROX 72
 
-struct GMT_DATASEGMENT * gmt_get_geo_ellipse_old (struct GMT_CTRL *GMT, double lon, double lat, double major_km, double minor_km, double azimuth, uint64_t m) {
-	/* gmt_get_geo_ellipse takes the location, axes (in km), and azimuth of the ellipse's major axis
-	   and computes coordinates for an approximate ellipse using N-sided polygon.
-	   If m > 0 then we l\set N = m and use that many points.  Otherwise (m == 0), we will
-	   determine N by looking at the spacing between successive points for a trial N and
-	   then scale N up or down to satisfy the minimum point spacing criteria. */
-
-	uint64_t i, N;
-	double delta_azimuth, sin_azimuth, cos_azimuth, sinp, cosp, ax, ay, axx, ayy, bx, by, bxx, byy, L;
-	double major, minor, center, *px = NULL, *py = NULL;
-	char header[GMT_LEN256] = {""};
-	struct GMT_DATASEGMENT *S = NULL;
-
-	major = major_km * 500.0, minor = minor_km * 500.0;	/* Convert to meters (x1000) of semi-major (/2) and semi-minor axes */
-	/* Set up local azimuthal equidistant projection */
-	sincosd (90.0 - azimuth, &sin_azimuth, &cos_azimuth);
-	sincosd (lat, &sinp, &cosp);
-
-	center = (GMT->current.proj.central_meridian < GMT->common.R.wesn[XLO] || GMT->current.proj.central_meridian > GMT->common.R.wesn[XHI]) ? 0.5 * (GMT->common.R.wesn[XLO] + GMT->common.R.wesn[XHI]) : GMT->current.proj.central_meridian;
-
-	if (m == 0) {	/* Determine N */
-		delta_azimuth = 2.0 * M_PI / GMT_ELLIPSE_APPROX;	/* Initial guess of angular spacing */
-		/* Compute distance between first two points and compare to map_line_step to determine angular spacing */
-		gmtmap_ellipse_point (GMT, lon, lat, center, sinp, cosp, major, minor, cos_azimuth, sin_azimuth, 0.0, &ax, &ay);
-		gmtmap_ellipse_point (GMT, lon, lat, center, sinp, cosp, major, minor, cos_azimuth, sin_azimuth, delta_azimuth, &bx, &by);
-		gmt_geo_to_xy (GMT, ax, ay, &axx, &ayy);
-		gmt_geo_to_xy (GMT, bx, by, &bxx, &byy);
-		L = hypot (axx - bxx, ayy - byy);
-		N = (uint64_t) irint (GMT_ELLIPSE_APPROX * L / GMT->current.setting.map_line_step);
-		GMT_Report (GMT->parent, GMT_MSG_DEBUG, "Ellipse will be approximated by %d-sided polygon\n", N);
-		/* Approximate ellipse by a N-sided polygon */
-	}
-	else	/* Approximate ellipse by a m-sided polygon */
-		N = m;
-	delta_azimuth = 2.0 * M_PI / N;
-	/* Allocate datasetgment of the right size */
-	S = GMT_Alloc_Segment (GMT->parent, GMT_NO_STRINGS, N+1, 2, NULL, NULL);
-	px = S->data[GMT_X];	py = S->data[GMT_Y];
-
-	for (i = 0; i < N; i++)
-		gmtmap_ellipse_point (GMT, lon, lat, center, sinp, cosp, major, minor, cos_azimuth, sin_azimuth, i * delta_azimuth, &px[i], &py[i]);
-
-	/* Explicitly close the polygon */
-	px[N] = px[0], py[N] = py[0];
-	if (doubleAlmostEqual (major_km, minor_km))
-		snprintf (header, GMT_LEN256, "Circle around %g/%g with diameter %g km approximated by %" PRIu64 " points", lon, lat, major_km, N);
-	else
-		snprintf (header, GMT_LEN256, "Ellipse around %g/%g with major/minor axes %g/%g km and major axis azimuth %g approximated by %" PRIu64 " points", lon, lat, major_km, minor_km, azimuth, N);
-	S->header = strdup (header);
-	return (S);
-}
-
 double gmt_ellipse_circumference (struct GMT_CTRL *GMT, double major, double minor) {
-	double h = pow (major - minor, 2.0) / pow (major + minor, 2.0);
-	double C = M_PI * (major + minor) * (1.0 + (3.0 * h)/(10.0 + sqrt (4.0 - 3.0 * h)));	/* Ramanujan approximation of ellipse circumference from semi-major/minor xes*/
+	/* Ramanujan approximation of ellipse circumference from semi-major/minor axes */
+	double h = pow (major - minor, 2.0) / pow (major + minor, 2.0);	/* h is zero for a circle */
+	double C = M_PI * (major + minor) * (1.0 + (3.0 * h)/(10.0 + sqrt (4.0 - 3.0 * h)));
 	return (C);
 }
 
