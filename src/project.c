@@ -906,7 +906,7 @@ EXTERN_MSC int GMT_project (void *V_API, int mode, void *args) {
 		P.output_choice[2] = 2;
 		if (Ctrl->Z.active) {	/* Do the full ellipse */
 			Ctrl->L.min = 0.0;
-			Ctrl->L.max = gmt_ellipse_circumference (GMT, Ctrl->Z.major,Ctrl->Z.minor);
+			Ctrl->L.max = gmt_ellipse_circumference (GMT, Ctrl->Z.major, Ctrl->Z.minor);
 			if (Ctrl->Z.number)	/* Want a specific number of points */
 				Ctrl->G.inc = Ctrl->L.max / rint (Ctrl->G.inc);
 			else if (Ctrl->Z.exact) {	/* Adjust inc to fit the ellipse perimeter exactly */
@@ -957,7 +957,13 @@ EXTERN_MSC int GMT_project (void *V_API, int mode, void *args) {
 				z_header = strdup ("Testing Cartesian ellipse");
 			}
 			else {	/* Geographic ellipse */
-				struct GMT_DATASEGMENT *S = gmt_get_geo_ellipse (GMT, Ctrl->C.x, Ctrl->C.y, Ctrl->Z.major, Ctrl->Z.minor, Ctrl->Z.azimuth, ne);
+				struct GMT_DATASEGMENT *S = NULL;
+				if ((S = gmt_get_geo_ellipse (GMT, Ctrl->C.x, Ctrl->C.y, Ctrl->Z.major, Ctrl->Z.minor, Ctrl->Z.azimuth, ne)) == NULL) {
+					GMT_Report (API, GMT_MSG_ERROR, "Could not generate ellipse - aborting\n");
+					gmt_M_free (GMT, p_data);
+					gmt_M_free (GMT, Out);
+					Return (GMT_RUNTIME_ERROR);
+				}
 				for (rec = 0; rec < P.n_used; rec++) {
 					p_data[rec].a[4] = S->data[GMT_X][rec];
 					p_data[rec].a[5] = S->data[GMT_Y][rec];
