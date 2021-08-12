@@ -438,6 +438,22 @@ GMT_LOCAL uint64_t gmtio_bin_colselect (struct GMT_CTRL *GMT) {
 	return (GMT->common.i.n_cols);
 }
 
+unsigned int gmt_validate_geometry (struct GMT_CTRL *GMT, unsigned int requested_geometry) {
+	/* Check if geospatial data with a geometry matches what GMT thinks will be plotted.  It always returns 1 */
+	unsigned int actual_geometry;
+	static const char *geometries[4] = {"POINT", "LINE", "", "POLYGON"};
+	if (GMT->current.io.OGR == NULL) return (1);		/* Nothing to check */
+	actual_geometry = GMT->current.io.OGR->geometry;
+	if (actual_geometry > GMT_IS_MULTI) actual_geometry -= GMT_IS_MULTI;	/* Do not need the multi part here */
+	if (actual_geometry > GMT_IS_POLY) return (1);		/* Nothing to check */
+	if (requested_geometry > GMT_IS_POLY) return (1);		/* Nothing to check */
+	if (actual_geometry != requested_geometry) {
+		GMT_Report (GMT->parent, GMT_MSG_WARNING, "Input data claims a geometry of %s but you have selected a geometry of %s.\n",
+			geometries[actual_geometry-1], geometries[requested_geometry-1]);
+	}
+	return (1);
+}
+
 /*! Return the floating point value associated with the aspatial value V given its type as a double */
 GMT_LOCAL double gmtio_convert_aspatial_value (struct GMT_CTRL *GMT, unsigned int type, char *V) {
 

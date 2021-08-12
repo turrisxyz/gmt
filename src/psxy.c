@@ -1025,7 +1025,7 @@ EXTERN_MSC int GMT_psxy (void *V_API, int mode, void *args) {
 	bool default_outline = false, outline_active = false, geovector = false, save_W = false, save_G = false, QR_symbol = false;
 	unsigned int n_needed = 0, n_cols_start = 2, justify = 0, tbl, grid_order = 0, frame_order = 0;
 	unsigned int n_total_read = 0, j, geometry, xcol = 0, icol = 0, tcol_f = 0, tcol_s = 0, n_z = 0, k, kk;
-	unsigned int bcol, ex1, ex2, ex3, change = 0, pos2x, pos2y, save_u = false;
+	unsigned int bcol, ex1, ex2, ex3, change = 0, pos2x, pos2y, save_u = false, geo_validated = 0;
 	unsigned int xy_errors[2], error_type[2] = {EBAR_NONE, EBAR_NONE}, error_cols[5] = {0,1,2,4,5};
 	int error = GMT_NOERROR, outline_setting = 0, seq_n_legends = 0, seq_frequency = 0;
 	uint64_t n_z_for_cpt = 0;
@@ -1480,6 +1480,8 @@ EXTERN_MSC int GMT_psxy (void *V_API, int mode, void *args) {
 			}
 
 			/* Data record to process */
+
+			if (!geo_validated) geo_validated = gmt_validate_geometry (GMT, geometry);
 
 			in = In->data;
 			n_total_read++;
@@ -2269,6 +2271,7 @@ EXTERN_MSC int GMT_psxy (void *V_API, int mode, void *args) {
 			GMT_Report (API, GMT_MSG_ERROR, "Input data have %d column(s) but at least 2 are needed\n", (int)D->n_columns);
 			Return (GMT_DIM_TOO_SMALL);
 		}
+		if (!geo_validated) geo_validated = gmt_validate_geometry (GMT, geometry);
 
 		if (Ctrl->G.sequential || Ctrl->W.sequential) {	/* Load in the color-list as a categorical CPT */
 			if ((A = GMT_Read_Data (API, GMT_IS_PALETTE, GMT_IS_FILE, GMT_IS_NONE, GMT_READ_NORMAL, NULL, GMT->current.setting.color_set, NULL)) == NULL) {
