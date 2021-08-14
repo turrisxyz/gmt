@@ -2010,6 +2010,7 @@ EXTERN_MSC int GMT_psscale (void *V_API, int mode, void *args) {
 	gmt_adjust_refpoint (GMT, Ctrl->D.refpoint, dim, Ctrl->D.off, Ctrl->D.justify, PSL_BL);	/* Adjust refpoint to BL corner */
 	GMT_Report (GMT->parent, GMT_MSG_DEBUG, "After shifts, Bar reference x = %g y = %g\n", Ctrl->D.refpoint->x, Ctrl->D.refpoint->y);
 	PSL_setorigin (PSL, Ctrl->D.refpoint->x, Ctrl->D.refpoint->y, 0.0, PSL_FWD);
+	gmt_set_cartesian (GMT, GMT_IN);	/* Since that is what the color bar is (-R -J is not related to it) */
 
 	GMT->current.map.frame.side[S_SIDE] = GMT->current.map.frame.side[E_SIDE] = GMT->current.map.frame.side[N_SIDE] = GMT->current.map.frame.side[W_SIDE] = GMT_AXIS_ALL;
 

@@ -1605,7 +1605,7 @@ GMT_LOCAL void gmtplot_theta_r_map_boundary (struct GMT_CTRL *GMT, struct PSL_CT
 	else if (k) {   /* Must plot now */
 		PSL_plotline (PSL, GMT->current.plot.x, GMT->current.plot.y, (int)k, PSL_MOVE|PSL_STROKE);
 		k = 0;
-    }
+	}
 	/* Now at W (XLO, YLO).  If need to add a radial W boundary add it now to the array, ending at XLO, YHI (where we started) */
 	if (GMT->current.map.frame.side[W_SIDE] & GMT_AXIS_DRAW) {
 		gmt_geo_to_xy (GMT, GMT->common.R.wesn[XLO], GMT->common.R.wesn[YLO], &GMT->current.plot.x[k], &GMT->current.plot.y[k]);	k++;
@@ -1698,6 +1698,29 @@ GMT_LOCAL bool gmtplot_annot_too_crowded (struct GMT_CTRL *GMT, double x, double
 	GMT_x_annotation[side][GMT_n_annotations[side]] = x, GMT_y_annotation[side][GMT_n_annotations[side]] = y, GMT_n_annotations[side]++;
 
 	return (false);
+}
+
+void gmtplot_annot_too_crowded_reset (struct GMT_CTRL *GMT) {
+	/* After plotting a frame we must optionally report how many annotations were
+	 * skipped and then reset the counters for the next frame to be plotted */
+	bool too_crowded = false;	/* Only report it this becomes true */
+	for (unsigned int side = 0; side < 4; side++) {  /* Reset annotation crowdedness arrays */
+		if (GMT_n_annotations[side]) {
+			gmt_M_free (GMT, GMT_x_annotation[side]);
+			gmt_M_free (GMT, GMT_y_annotation[side]);
+			GMT_n_annotations[side] = GMT_alloc_annotations[side] = 0;
+		}
+		if (GMT_n_annotations_skip[side]) {
+			static char *name[4] = {"bottom", "right", "top", "left"};
+			GMT_Report (GMT->parent, GMT_MSG_WARNING, "%d annotations along the %s border were skipped due to crowding.\n", GMT_n_annotations_skip[side], name[side]);
+			too_crowded = true;
+			GMT_n_annotations_skip[side] = 0;
+		}
+	}
+	if (too_crowded) {
+		GMT_Report (GMT->parent, GMT_MSG_WARNING, "Crowding decisions is controlled by MAP_ANNOT_MIN_SPACING, currently set to %s.\n", GMT->current.setting.map_annot_min_spacing_txt);
+		GMT_Report (GMT->parent, GMT_MSG_WARNING, "Decrease or increase MAP_ANNOT_MIN_SPACING to see more or fewer annotations, with 0 showing all annotations.\n");
+	}
 }
 
 /*! . */
@@ -5357,6 +5380,7 @@ void gmt_xy_axis (struct GMT_CTRL *GMT, double x0, double y0, double length, dou
 	unsigned int axis = A->id;	/* Axis id (GMT_X, GMT_Y, GMT_Z) */
 	unsigned int justify;
 	unsigned int lx_just = PSL_BC, ly_just = PSL_BC;
+	unsigned int wesn_side; /* 0-3, which WESN side we are annotation via -B */
 	bool horizontal;		/* true if axis is horizontal */
 	bool annotate = ((side & GMT_AXIS_ANNOT) > 0);
 	bool neg = below;		/* true if annotations are to the left of or below the axis */
@@ -5372,8 +5396,9 @@ void gmt_xy_axis (struct GMT_CTRL *GMT, double x0, double y0, double length, dou
 	bool angled = false;		/* True if user used +angle to select a slanted annotation */
 	bool skip = false, just_set = false;
 	bool save_pi = GMT->current.plot.substitute_pi;
+	bool reset_min_spacing = false;
 	double *knots = NULL, *knots_p = NULL;	/* Array pointers with tick/annotation knots, the latter for primary annotations */
-	double x, t_use, text_angle, cos_a = 0.0, sin_a = 0.0, delta;	/* Misc. variables */
+	double x, t_use, text_angle, cos_a = 0.0, sin_a = 0.0, delta, map_annot_min_spacing = GMT->current.setting.map_annot_min_spacing;	/* Misc. variables */
 	double x_angle_add = 0.0, y_angle_add = 0.0;	/* Used when dealing with perspectives */
 	struct GMT_FONT font;			/* Annotation font (FONT_ANNOT_PRIMARY or FONT_ANNOT_SECONDARY) */
 	struct GMT_PLOT_AXIS_ITEM *T = NULL;	/* Pointer to the current axis item */
@@ -5396,6 +5421,7 @@ void gmt_xy_axis (struct GMT_CTRL *GMT, double x0, double y0, double length, dou
 			default: x_angle_add = y_angle_add = 0.0; break;
 		}
 	}
+	wesn_side = axis + 2 * (!below);
 	horizontal = (axis == GMT_X);	/* This is a horizontal axis */
 	xyz_fwd = ((axis == GMT_X) ? &gmt_x_to_xx : (axis == GMT_Y) ? &gmt_y_to_yy : &gmt_z_to_zz);
 	primary = gmtplot_get_primary_annot (A);			/* Find primary axis items */
@@ -5440,7 +5466,11 @@ void gmt_xy_axis (struct GMT_CTRL *GMT, double x0, double y0, double length, dou
 			cos_a = cosd (text_angle);	/* Full-height of text at an angle */
 			sin_a = fabs (sind (text_angle));	/* The y offset due to slanted annotation */
 		}
+		reset_min_spacing = true;
 	}
+	else if (!horizontal)
+		reset_min_spacing = true;
+	if (reset_min_spacing) GMT->current.setting.map_annot_min_spacing = 0.0;
 	flip = (GMT->current.setting.map_frame_type & GMT_IS_INSIDE);	/* Inside annotation */
 	if (axis != GMT_Z && GMT->current.proj.three_D && GMT->current.proj.z_project.cos_az > 0) {	/* Rotate x/y-annotations when seen "from North" */
 		if (!flip) justify = gmt_flip_justify (GMT, justify);
@@ -5613,6 +5643,7 @@ void gmt_xy_axis (struct GMT_CTRL *GMT, double x0, double y0, double length, dou
 				if (gmtlib_annot_pos (GMT, val0, val1, T, &knots[i], &t_use)) continue;			/* Outside range */
 				if (axis == GMT_Z && fabs (knots[i] - GMT->current.proj.z_level) < GMT_CONV8_LIMIT) continue;	/* Skip z annotation coinciding with z-level plane */
 				x = (*xyz_fwd) (GMT, t_use);	/* Convert to inches on the page */
+				if (gmtplot_annot_too_crowded (GMT, x, 0.0, wesn_side)) continue;	/* Since along a straight border we don't need to worry about y and pass 0 */
 				if (GMT->current.setting.map_frame_type & GMT_IS_INSIDE && (fabs (x) < GMT_CONV4_LIMIT || fabs (x - length) < GMT_CONV4_LIMIT)) continue;	/* Skip annotation on edges when MAP_FRAME_TYPE = inside */
 				if (!is_interval && gmtplot_skip_second_annot (k, knots[i], knots_p, np, primary)) continue;	/* Secondary annotation skipped when coinciding with primary annotation */
 				/* Move to new anchor point */
@@ -5630,6 +5661,7 @@ void gmt_xy_axis (struct GMT_CTRL *GMT, double x0, double y0, double length, dou
 				PSL_plottext (PSL, 0.0, 0.0, -font.size, string, text_angle, justify, form);
 			}
 			if (!faro) PSL_command (PSL, "/PSL_A%d_y PSL_A%d_y PSL_AH%d add def\n", annot_pos, annot_pos, annot_pos);
+			gmtplot_annot_too_crowded_reset (GMT);	/* So that primary annotations do not affect secondary annotations spacing */
 		}
 
 		if (nx) gmt_M_free (GMT, knots);
@@ -5686,6 +5718,7 @@ void gmt_xy_axis (struct GMT_CTRL *GMT, double x0, double y0, double length, dou
 	PSL_setorigin (PSL, -x0, -y0, 0.0, PSL_INV);
 
 	GMT->current.plot.substitute_pi = save_pi;
+	if (reset_min_spacing) GMT->current.setting.map_annot_min_spacing = map_annot_min_spacing;
 }
 
 GMT_LOCAL unsigned int gmtplot_the_side_we_cut (struct GMT_CTRL *GMT, double x, double y) {
@@ -6296,7 +6329,7 @@ void gmt_map_basemap (struct GMT_CTRL *GMT) {
 	 */
 
 	unsigned int side;
-	bool clip_on = false, too_crowded = false;
+	bool clip_on = false;
 	char *order[2] = {"before", "after"};
 	struct PSL_CTRL *PSL= GMT->PSL;
 
@@ -6370,23 +6403,8 @@ void gmt_map_basemap (struct GMT_CTRL *GMT) {
 
 	PSL_comment (PSL, "End of basemap (placed %s the plot contents)\n", order[GMT->current.map.frame.order]);
 
-	for (side = 0; side < 4; side++) {	/* Reset annotation crowdedness arrays */
-		if (GMT_n_annotations[side]) {
-			gmt_M_free (GMT, GMT_x_annotation[side]);
-			gmt_M_free (GMT, GMT_y_annotation[side]);
-			GMT_n_annotations[side] = GMT_alloc_annotations[side] = 0;
-		}
-		if (GMT_n_annotations_skip[side]) {
-			static char *name[4] = {"bottom", "right", "top", "left"};
-			GMT_Report (GMT->parent, GMT_MSG_WARNING, "%d annotations along the %s border were skipped due to crowding.\n", GMT_n_annotations_skip[side], name[side]);
-			too_crowded = true;
-			GMT_n_annotations_skip[side] = 0;
-		}
-	}
-	if (too_crowded) {
-		GMT_Report (GMT->parent, GMT_MSG_WARNING, "Crowding decisions is controlled by MAP_ANNOT_MIN_SPACING, currently set to %s.\n", GMT->current.setting.map_annot_min_spacing_txt);
-		GMT_Report (GMT->parent, GMT_MSG_WARNING, "Decrease or increase MAP_ANNOT_MIN_SPACING to see more or fewer annotations, with 0 showing all annotations.\n");
-	}
+	gmtplot_annot_too_crowded_reset (GMT);
+
 	PSL_setcolor (PSL, GMT->current.setting.map_default_pen.rgb, PSL_IS_STROKE);
 
 	if (GMT->current.map.frame.order == GMT_BASEMAP_AFTER) {	/* Undo at end in case of multi processes */

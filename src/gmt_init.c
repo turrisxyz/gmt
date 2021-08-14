@@ -9906,10 +9906,16 @@ void gmt_set_undefined_defaults (struct GMT_CTRL *GMT, double plot_dim, bool con
 		if (conf_update) GMT_keyword_updated[GMTCASE_MAP_HEADING_OFFSET] = true;
 	}
 	if (gmt_M_is_dnan (GMT->current.setting.map_annot_min_spacing)) {
-		GMT->current.setting.map_annot_min_spacing = 28 * pt * scale; /* 28p */
-		auto_scale = true;
+		if (gmt_M_is_geographic (GMT, GMT_IN)) {	/* Only automatic minimum spacing for geographic map frames */
+			GMT->current.setting.map_annot_min_spacing = 28 * pt * scale; /* 28p */
+			auto_scale = true;
+			snprintf (GMT->current.setting.map_annot_min_spacing_txt, GMT_LEN16, "%.6gp", GMT->current.setting.map_annot_min_spacing / pt);
+		}
+		else {	/* Must be set specifically via --MAP_ANNOT_MIN_SPACING, but there may be complications with primary and secondary annotations */
+			GMT->current.setting.map_annot_min_spacing = 0.0;
+			snprintf (GMT->current.setting.map_annot_min_spacing_txt, GMT_LEN16, "0");
+		}
 		if (conf_update) GMT_keyword_updated[GMTCASE_MAP_ANNOT_MIN_SPACING] = true;
-		snprintf (GMT->current.setting.map_annot_min_spacing_txt, GMT_LEN16, "%.6gp", GMT->current.setting.map_annot_min_spacing / pt);
 	}
 
 	/* Must first do map_frame_width since it may be used below */
