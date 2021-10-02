@@ -23,6 +23,7 @@ Synopsis
 [ |SYN_OPT-V| ]
 [ |-W|\ [*dir*] ]
 [ |-Z| ]
+[ |SYN_OPT-f| ]
 [ |SYN_OPT-x| ]
 [ |SYN_OPT--| ]
 
@@ -139,6 +140,9 @@ Optional Arguments
     Erase the *mainscript* and all input scripts given via **-I** and **-S** upon completion.  Not compatible
     with **-Q**.
 
+.. |Add_-f| unicode:: 0x20 .. just an invisible code
+.. include:: explain_-f.rst_
+
 .. _-cores:
 
 **-x**\ [[-]\ *n*]
@@ -147,7 +151,7 @@ Optional Arguments
     (if too large it will be truncated to the maximum cores available).  Finally,
     give a negative *n* to select (all - *n*) cores (or at least 1 if *n* equals or exceeds all).
     The parallel processing does not depend on OpenMP; new jobs are launched when the previous ones
-    complete.
+    complete. **Note**: One core is reserved by **batch** so in effect *n-1* are used for the jobs.
 
 .. include:: explain_help.rst_
 

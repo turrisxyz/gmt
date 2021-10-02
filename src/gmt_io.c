@@ -3358,9 +3358,11 @@ GMT_LOCAL unsigned int gmtio_examine_current_record (struct GMT_CTRL *GMT, char 
 		}
 		*tpos = pos;
 	}
-	if (found_text && col == 0 && !GMT->common.i.select) {	/* Has to be a non-GMT header with just text starting in the first column - treat as header */
-		gmt_M_free (GMT, type);
-		return GMT_NOT_OUTPUT_OBJECT;
+	if (found_text && col == 0 && !GMT->common.i.select && phys_col_type != GMT_IS_STRING) {	/* Has to be a non-GMT header with just text starting in the first column - treat as header */
+		if (strncmp (GMT->init.module_name, "batch", 5U) && strncmp (GMT->init.module_name, "movie", 5U)) {	/* Make exception for these modules what often will just read text lines */
+			gmt_M_free (GMT, type);
+			return GMT_NOT_OUTPUT_OBJECT;
+		}
 	}
 	*n_columns = col;	/* Pass back the numerical column count */
 	if (GMT->common.i.end)	/* Asked for unspecified last column on input (e.g., -i3,2,5:), supply the missing last column number */
@@ -5698,6 +5700,27 @@ void gmt_ascii_format_one (struct GMT_CTRL *GMT, char *text, double x, unsigned 
 			sprintf (text, GMT->current.setting.format_float_out, x);
 			break;
 	}
+}
+
+void gmt_ascii_format_inc (struct GMT_CTRL *GMT, char *text, double x, unsigned int type) {
+	char unit;
+	double d_inc = GMT_DEG2SEC_F * x;
+	unsigned int inc = urint (d_inc);
+	if ((type & GMT_IS_GEO) == 0 || fabs (d_inc - inc) > GMT_CONV6_LIMIT) {	/* Cartesian or not a clear multiple of arc seconds */
+		sprintf (text, GMT->current.setting.format_float_out, x);
+		return;
+	}
+
+	unit = 's';
+	if (inc >= 60 && (inc % 60) == 0) {	/* Arc minutes perhaps */
+		inc /= 60;
+		unit = 'm';
+	}
+	if (inc >= 60 && (inc % 60) == 0) {	/* Arc seconds perhaps */
+		inc /= 60;
+		unit = 'd';
+	}
+	sprintf (text, "%d%c", inc, unit);
 }
 
 /*! . */

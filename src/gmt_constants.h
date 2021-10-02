@@ -93,6 +93,17 @@
 
 #define GMT_JPEG_DEF_QUALITY	90	/* Default JPG quality value for psconvert -Tj */
 
+/*! Constants for use with calls to gmt_solve_svd (used in greenspline and geodesy/gpsgridder) */
+enum GMT_enum_svd {
+	GMT_SVD_EIGEN_RATIO_CUTOFF		= 0,	/* Only use eigenvalues whose ratio to the first exceeds a cutoff [0 = all] */
+	GMT_SVD_EIGEN_NUMBER_CUTOFF		= 1,	/* Only use the first N largest eigenvalues */
+	GMT_SVD_EIGEN_PERCENT_CUTOFF	= 2,	/* Only use a percentage of the (sorted) eigenvalues */
+	GMT_SVD_EIGEN_VARIANCE_CUTOFF	= 3,	/* Find N eigenvalues that equals given percentage of variance explained */
+	GMT_SVD_NO_HISTORY				= 0,	/* Only obtain final solution for selected eigenvalues */
+	GMT_SVD_INCREMENTAL				= 1,	/* Evaluate incremental solution due to next added eigenvalue */
+	GMT_SVD_CUMULATIVE				= 2		/* Evaluate cumulative solution due to next added eigenvalue */
+};
+
 /*! whether to ignore/read/write history file gmt.history */
 enum GMT_enum_history {
 	/*! 0 */	GMT_HISTORY_OFF = 0,
