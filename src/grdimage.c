@@ -1224,13 +1224,16 @@ EXTERN_MSC int GMT_grdimage (void *V_API, int mode, void *args) {
 		}
 	}
 
-	/* Determine if grid/image is to be projected */
+	/* Determine if grid/image is to be projected and if padding is required */
 	need_to_project = (gmt_M_is_nonlinear_graticule (GMT) || Ctrl->E.dpi > 0);
-	if (need_to_project)
-		GMT_Report (API, GMT_MSG_DEBUG, "Projected grid is non-orthogonal, nonlinear, or dpi was changed\n");
-	else  if (Ctrl->D.active)			/* If not projecting no need for a pad */
-		gmt_set_pad(GMT, 0);
 	pad_mode = (need_to_project && GMT->common.n.interpolant > BCR_BILINEAR) ? GMT_GRID_NEEDS_PAD2 : 0;
+	if (need_to_project)
+		GMT_Report (API, GMT_MSG_DEBUG, "Projected grid is non-orthogonal, nonlinear, or dpi was changed, requiring projection\n");
+	else if (Ctrl->D.active)	/* No need for a pad */
+		gmt_set_pad(GMT, 0);
+	if (pad_mode == 0)			/* No need for a pad, change setting */
+		gmt_set_pad (GMT, 0);
+
 	/* Read the illumination grid header right away so we can use its region to set that of an image (if requested) */
 	if (use_intensity_grid) {	/* Illumination grid desired */
 		if (Ctrl->I.derive) {	/* Illumination grid must be derived */
