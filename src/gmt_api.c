@@ -3941,14 +3941,18 @@ GMT_LOCAL struct GMT_DATASET * gmtapi_import_dataset (struct GMTAPI_CTRL *API, i
 				S = D_obj->table[D_obj->n_tables]->segment[0] = GMT_Alloc_Segment (API, smode, 0, n_columns, NULL, NULL);
 				SH = gmt_get_DS_hidden (S);
 				for (col = 0; col < V_obj->n_columns; col++) {
-					if (GMT->common.i.select)	/* -i has selected some columns */
+					if (GMT->common.i.select) {	/* -i has selected some columns */
 						col_pos = GMT->current.io.col[GMT_IN][col].col;	/* Which data column to pick */
-					else if (GMT->current.setting.io_lonlat_toggle[GMT_IN] && col < GMT_Z)	/* Worry about -: for lon,lat */
+						col_pos_out = GMT->current.io.col[GMT_IN][col].order; /* Which data column to place it on output */
+					}
+					else if (GMT->current.setting.io_lonlat_toggle[GMT_IN] && col < GMT_Z) {	/* Worry about -: for lon,lat */
 						col_pos = 1 - col;	/* Read lat/lon instead of lon/lat */
+						col_pos_out = col;
+					}
 					else
-						col_pos = col;	/* Just goto that column */
-					S->data[col] = V_obj->data[col_pos].f8;
-					SH->alloc_mode[col] = VH->alloc_mode[col];	/* Inherit from what we got */
+						col_pos = col_pos_out = col;	/* Just goto that column */
+					S->data[col_pos_out] = V_obj->data[col_pos].f8;
+					SH->alloc_mode[col_pos_out] = VH->alloc_mode[col];	/* Inherit from what we got */
 				}
 				DH = gmt_get_DD_hidden (D_obj);
 				if (smode) S->text = V_obj->text;
@@ -9120,27 +9124,6 @@ int GMT_Close_VirtualFile_ (unsigned int *family, char *string, int len) {
 	return (GMT_Close_VirtualFile (GMT_FORTRAN, string));
 }
 #endif
-
-int gmtlib_delete_virtualfile (void *V_API, const char *string) {
-	/* Given a VirtualFile name, delete its record bu NULLing it */
-	int object_ID, item;
-	struct GMTAPI_DATA_OBJECT *S_obj = NULL;
-	struct GMTAPI_CTRL *API = NULL;
-	if (V_API == NULL) return_error (V_API, GMT_NOT_A_SESSION);
-	if (string == NULL) return_error (V_API, GMT_PTR_IS_NULL);
-	if ((object_ID = gmtapi_decode_id (string)) == GMT_NOTSET)
-		return_error (V_API, GMT_OBJECT_NOT_FOUND);
-	API = gmtapi_get_api_ptr (V_API);
-	if ((item = gmtlib_validate_id (API, GMT_NOTSET, object_ID, GMT_NOTSET, GMT_NOTSET)) == GMT_NOTSET)
-		return_error (API, GMT_OBJECT_NOT_FOUND);
-	S_obj = API->object[item];	/* Short-hand */
-	if (S_obj->family != S_obj->actual_family)	/* Reset the un-masquerading that GMT_Open_VirtualFile did */
-		S_obj->family = S_obj->actual_family;
-	S_obj->no_longer_owner = true;
-	S_obj->resource = NULL;
-
-	return GMT_NOERROR;
-}
 
 void * GMT_Read_VirtualFile (void *V_API, const char *string) {
 	/* Given a VirtualFile name, retrieve the resulting object */
