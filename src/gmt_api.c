@@ -5067,7 +5067,7 @@ start_over_import_grid:		/* We may get here if we cannot honor a GMT_IS_REFERENC
 					if (mode & GMT_DATA_ONLY) return_null (API, GMT_NO_GRDHEADER);		/* For mode & GMT_DATA_ONLY the grid must already be allocated */
                     if (API->got_remote_wesn) { /* Use the tile information */
 						unsigned g_reg = (API->tile_reg == 'g') ? GMT_GRID_NODE_REG : GMT_GRID_PIXEL_REG;
-						double g_inc[2] = {API->tile_inc, API->tile_inc}; /* Must duplicate due to syntax below */
+						double g_inc[2] = {API->tile_d_inc, API->tile_d_inc}; /* Must duplicate due to syntax below */
 						if (!full_region (API->tile_wesn)) {	/* Ensure any -R via DCW is rounded by these known increments */
 							API->tile_wesn[XLO] = floor ((API->tile_wesn[XLO] / g_inc[GMT_X]) + GMT_CONV8_LIMIT) * g_inc[GMT_X];
 							API->tile_wesn[XHI] = ceil  ((API->tile_wesn[XHI] / g_inc[GMT_X]) - GMT_CONV8_LIMIT) * g_inc[GMT_X];

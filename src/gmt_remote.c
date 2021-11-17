@@ -1668,8 +1668,9 @@ char *gmtlib_get_tile_list (struct GMTAPI_CTRL *API, double wesn[], int k_data, 
 			wesn[YHI] = ceil  ((wesn[YHI] / Is->d_inc) - GMT_CONV8_LIMIT) * Is->d_inc;
 		}
 		if (n_tiles_s && n_tiles_p == 0) {	/* No primary tiles, update internal settings to reflect secondary settings */
-			API->tile_inc = Is->d_inc;
+			API->tile_d_inc = Is->d_inc;
 			API->tile_reg = Is->reg;
+			strncpy (API->tile_inc, Is->inc, GMT_LEN8);
 		}
 	}
 	fclose (fp);
@@ -1686,7 +1687,7 @@ struct GMT_GRID *gmtlib_assemble_tiles (struct GMTAPI_CTRL *API, double *region,
 	int k_data, v_level = API->verbose;
 	struct GMT_GRID *G = NULL;
 	double *wesn = (region) ? region : API->tile_wesn;	/* Default to -R */
-	char grid[GMT_VF_LEN] = {""}, cmd[GMT_LEN256] = {""}, code = 0;;
+	char grid[GMT_VF_LEN] = {""}, cmd[GMT_LEN256] = {""}, code = 0, reg, *inc = NULL;
 	struct GMT_GRID_HEADER_HIDDEN *HH = NULL;
 
 	(void) gmt_file_is_tiled_list (API, file, NULL, &code, NULL);	/* Just get the code*/
@@ -1696,10 +1697,12 @@ struct GMT_GRID *gmtlib_assemble_tiles (struct GMTAPI_CTRL *API, double *region,
 		return NULL;
 	}
 
+	inc = (API->tile_inc[0]) ? API->tile_inc : API->remote_info[k_data].inc;
+	reg = (API->tile_reg) ? API->tile_reg : API->remote_info[k_data].reg;
 	if (API->verbose == GMT_MSG_WARNING) API->verbose = GMT_MSG_ERROR;	/* Drop from warnings to errors only when calling grdblend to avoid annoying messages about phase/shift from SRTM01|3 and 15s */
 	GMT_Open_VirtualFile (API, GMT_IS_GRID, GMT_IS_SURFACE, GMT_OUT|GMT_IS_REFERENCE, NULL, grid);
 	/* Pass -N0 so that missing tiles (oceans) yield z = 0 and not NaN, and -Co+n to override using negative earth_relief_15s values */
-	snprintf (cmd, GMT_LEN256, "%s -R%.16g/%.16g/%.16g/%.16g -I%s -r%c -G%s -fg -Co+n", file, wesn[XLO], wesn[XHI], wesn[YLO], wesn[YHI], API->remote_info[k_data].inc, API->remote_info[k_data].reg, grid);
+	snprintf (cmd, GMT_LEN256, "%s -R%.16g/%.16g/%.16g/%.16g -I%s -r%c -G%s -fg -Co+n", file, wesn[XLO], wesn[XHI], wesn[YLO], wesn[YHI], inc, reg, grid);
 	if (code != 'X') strcat (cmd, " -N0 -Ve");	/* If ocean/land, set empty nodes to 0, else NaN. Also turn of warnings since mixing pixel and gridline grids, possibly */
 	if (GMT_Call_Module (API, "grdblend", GMT_MODULE_CMD, cmd) != GMT_NOERROR) {
 		API->verbose = v_level;

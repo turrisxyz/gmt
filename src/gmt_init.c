@@ -15419,8 +15419,9 @@ struct GMT_CTRL *gmt_init_module (struct GMTAPI_CTRL *API, const char *lib_name,
 		for (opt = *options; opt; opt = opt->next) {	/* Loop over all options */
 			if (gmt_M_file_is_memory (opt->arg) || opt->arg[0] != '@') continue;	/* No remote file argument given */
 			if ((k_data = gmt_remote_dataset_id (API, opt->arg)) != GMT_NOTSET) {	/* Got a remote file to work on */
-				API->tile_inc = API->remote_info[k_data].d_inc;	/* In case rounding is needed elsewhere */
+				API->tile_d_inc = API->remote_info[k_data].d_inc;	/* In case rounding is needed elsewhere */
 				API->tile_reg = API->remote_info[k_data].reg;	/* So we can create a grid header without reading the tile data */
+				strncpy (API->tile_inc, API->remote_info[k_data].inc, GMT_LEN8);	/* For use with grdblend */
 			}
 			if ((k_data = gmt_remote_no_extension (API, opt->arg)) != GMT_NOTSET) {	/* Remote file without file extension */
 				char *file = malloc (strlen(opt->arg)+1+strlen (API->remote_info[k_data].ext));
@@ -15515,8 +15516,9 @@ struct GMT_CTRL *gmt_init_module (struct GMTAPI_CTRL *API, const char *lib_name,
 						GMT->session.unit_name[GMT->current.setting.proj_length_unit], GMT->current.setting.graphics_dpu, GMT->current.setting.graphics_dpu_unit, this_n_per_degree, opt->arg, file);
 					gmt_M_str_free (opt->arg);
 					opt->arg = strdup (file);
-					API->tile_inc = d_inc = API->remote_info[k_data2].d_inc;
+					API->tile_d_inc = d_inc = API->remote_info[k_data2].d_inc;
 					API->tile_reg = API->remote_info[k_data2].reg;
+					strncpy (API->tile_inc, API->remote_info[k_data2].inc, GMT_LEN8);	/* For use with grdblend */
 					strncpy (s_inc, API->remote_info[k_data2].inc, GMT_LEN8);
 					inc_set = true;
 					gmt_M_memcpy (wesn, GMT->common.R.wesn, 4, double);
@@ -15683,7 +15685,7 @@ void gmt_detect_oblique_region (struct GMT_CTRL *GMT, char *file) {
 	else if (gmt_M_360_range (wesn[XLO], wesn[XHI]) && gmt_M_360_range (GMT->common.R.wesn[XLO], GMT->common.R.wesn[XHI]))
 		gmt_M_memcpy (GMT->common.R.wesn, wesn, 2, double);	/* Reset to given global w/e in the same format */
 	gmt_M_memcpy (API->tile_wesn, GMT->common.R.wesn, 4, double);	/* Save the region we found */
-	d_inc = API->tile_inc;	/* Increment in degrees, if set */
+	d_inc = API->tile_d_inc;	/* Increment in degrees, if set */
 	if (d_inc == 0.0 && file && file[0] == '@' && (k_data = gmt_remote_dataset_id (API, file)) != GMT_NOTSET) {	/* Got a remote file to work on */
 		d_inc = API->remote_info[k_data].d_inc;	/* Increment in degrees */
 	}
