@@ -1620,7 +1620,7 @@ char *gmtlib_get_tile_list (struct GMTAPI_CTRL *API, double wesn[], int k_data, 
 	bool need_filler;
 	char tile_list[PATH_MAX] = {""}, stem[GMT_LEN32] = {""}, *file = NULL, **tile = NULL, datatype[3] = {'L', 'O', 'X'}, regtype[2] = {'G', 'P'};
 	int k_filler = GMT_NOTSET;
-	unsigned int k, n_tiles = 0, ocean = (srtm_flag) ? 0 : 2;
+	unsigned int k, n_tiles_p = 0, n_tiles_s = 0, ocean = (srtm_flag) ? 0 : 2;
 	FILE *fp = NULL;
 	struct GMT_DATA_INFO *Ip = &API->remote_info[k_data], *Is = NULL;	/* Pointer to primary tiled dataset */
 
@@ -1644,19 +1644,19 @@ char *gmtlib_get_tile_list (struct GMTAPI_CTRL *API, double wesn[], int k_data, 
 	file = tile_list;	/* Pointer to the buffer with the name */
 
 	/* Get the primary tiles and determine if the filler grid is needed */
-	tile = gmt_get_dataset_tiles (API, wesn, k_data, &n_tiles, &need_filler);
+	tile = gmt_get_dataset_tiles (API, wesn, k_data, &n_tiles_p, &need_filler);
 
 	/* Write primary tiles to list file */
-	for (k = 0; k < n_tiles; k++)
+	for (k = 0; k < n_tiles_p; k++)
 		fprintf (fp, "%s\n", tile[k]);
 
-	gmt_free_list (API->GMT, tile, n_tiles);	/* Free the primary tile list */
+	gmt_free_list (API->GMT, tile, n_tiles_p);	/* Free the primary tile list */
 	if (k_filler != GMT_NOTSET) {	/* Want the secondary tiles */
-		if (need_filler && (tile = gmt_get_dataset_tiles (API, wesn, k_filler, &n_tiles, NULL))) {
+		if (need_filler && (tile = gmt_get_dataset_tiles (API, wesn, k_filler, &n_tiles_s, NULL))) {
 			/* Write secondary tiles to list file */
-			for (k = 0; k < n_tiles; k++)
+			for (k = 0; k < n_tiles_s; k++)
 				fprintf (fp, "%s\n", tile[k]);
-			gmt_free_list (API->GMT, tile, n_tiles);	/* Free the secondary tile list */
+			gmt_free_list (API->GMT, tile, n_tiles_s);	/* Free the secondary tile list */
 		}
 		if (Ip->d_inc < Is->d_inc) {
 			/* If selected dataset has smaller increment that the filler grid then we adjust -R to be  a multiple of the larger spacing. */
@@ -1666,6 +1666,10 @@ char *gmtlib_get_tile_list (struct GMTAPI_CTRL *API, double wesn[], int k_data, 
 			wesn[XHI] = ceil  ((wesn[XHI] / Is->d_inc) - GMT_CONV8_LIMIT) * Is->d_inc;
 			wesn[YLO] = floor ((wesn[YLO] / Is->d_inc) + GMT_CONV8_LIMIT) * Is->d_inc;
 			wesn[YHI] = ceil  ((wesn[YHI] / Is->d_inc) - GMT_CONV8_LIMIT) * Is->d_inc;
+		}
+		if (n_tiles_s && n_tiles_p == 0) {	/* No primary tiles, update internal settings to reflect secondary settings */
+			API->tile_inc = Is->d_inc;
+			API->tile_reg = Is->reg;
 		}
 	}
 	fclose (fp);
