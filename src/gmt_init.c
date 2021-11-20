@@ -706,6 +706,7 @@ GMT_LOCAL void gmtinit_translate_to_short_options (struct GMTAPI_CTRL *API, stru
 	}
 }
 
+#if 0
 GMT_LOCAL void gmtinit_translate_to_long_options (struct GMTAPI_CTRL *API, struct GMT_KEYWORD_DICTIONARY *this_module_kw, struct GMT_OPTION **options) {
 	/* Loop over given options and replace any standard short-form -<code>[value] option with the equivalent
 	 *  long-form --parameter[=value] arguments. Specifically, long-format is defined as
@@ -725,6 +726,8 @@ GMT_LOCAL void gmtinit_translate_to_long_options (struct GMTAPI_CTRL *API, struc
 	gmt_M_unused (options);
 	/* NOT CODED YET - INTENDED FOR TESTING OUR KEYWORD/VALUE TRANSLATIONS */
 }
+#endif
+
 #endif
 
 GMT_LOCAL int gmtinit_check_markers (struct GMT_CTRL *GMT) {
@@ -6043,7 +6046,7 @@ GMT_LOCAL void gmtinit_def_us_locale (struct GMT_CTRL *GMT) {
 
 /*! . */
 int gmt_get_V (char arg) {
-	/* Parse the verbosity selection.  Using -Vqewticd, but backwards compatible with -Vqntcvld */
+	/* Parse the verbosity selection.  Using -Vqewticd [GMT_VERBOSE_CODES], but backwards compatible with -Vqntcvld */
 	int mode = GMT_MSG_QUIET;
 	switch (arg) {
 		case 'q': case '0': mode = GMT_MSG_QUIET;	break;	/* -Vq */

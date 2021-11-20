@@ -122,9 +122,11 @@ else (WIN32)
 	if (GS)
 		execute_process(COMMAND gs --version OUTPUT_VARIABLE answer OUTPUT_STRIP_TRAILING_WHITESPACE)
 		set (GMT_CONFIG_GS_MESSAGE "yes (${answer})" CACHE INTERNAL "GS config message")
+		set (GMT_CONFIG_GS_VERSION "${answer}" CACHE INTERNAL "GS version")
 	else (GS)
 		message (WARNING "Cannot find ghostscript program gs - gmt psconvert will be unable to convert PostScript to other formats")
 		set (GMT_CONFIG_GS_MESSAGE "no" CACHE INTERNAL "GS config message")
+		set (GMT_CONFIG_GS_VERSION "x.xx.x" CACHE INTERNAL "GS version")
 	endif (GS)
 endif (WIN32)
 
@@ -361,7 +363,7 @@ set (GMT_PROGS_SRCS batch.c blockmean.c blockmedian.c blockmode.c dimfilter.c do
 	grd2cpt.c grd2kml.c grd2xyz.c grdblend.c grdclip.c grdcontour.c grdconvert.c grdcut.c grdedit.c
 	grdfft.c grdfill.c grdfilter.c grdgdal.c grdgradient.c grdhisteq.c grdimage.c grdinfo.c
 	grdinterpolate.c grdlandmask.c grdmask.c grdmath.c grdmix.c grdpaste.c grdproject.c grdsample.c
-	grdtrack.c grdtrend.c grdvector.c grdview.c grdvolume.c greenspline.c kml2gmt.c makecpt.c
+	grdselect.c grdtrack.c grdtrend.c grdvector.c grdview.c grdvolume.c greenspline.c kml2gmt.c makecpt.c
 	mapproject.c movie.c nearneighbor.c project.c psbasemap.c psclip.c pscoast.c pscontour.c
 	psconvert.c psevents.c pshistogram.c psimage.c pslegend.c psmask.c psrose.c psscale.c
 	pssolar.c psternary.c pstext.c pswiggle.c psxy.c psxyz.c sample1d.c spectrum1d.c sph2grd.c
