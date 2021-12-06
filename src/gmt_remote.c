@@ -985,12 +985,19 @@ void gmt_refresh_server (struct GMTAPI_CTRL *API) {
 
 GMT_LOCAL char * gmtremote_switch_to_srtm (char *file, char *res) {
 	/* There may be more than one remote Earth DEM product that needs to share the
-	 * same 1x1 degree SRTM tiles.  This function handles this overlap; add more cases if needed. */
-	char *c = NULL;
-	if ((c = strstr (file, ".earth_relief_01s_g")) || (c = strstr (file, ".earth_synbath_01s_g")))
-		*res = '1';
-	else if ((c = strstr (file, ".earth_relief_03s_g")) || (c = strstr (file, ".earth_synbath_03s_g")))
-		*res = '3';
+	 * same 1x1 degree SRTM tiles.  This function handles this overlap; add more cases to gmt_remote.h f needed. */
+	char *c = NULL, pattern[GMT_LEN64] = {""};
+	int k = -1;
+	while (c == NULL && DEM_share_SRTM[++k]) {	/* Increments up front so -1 because 0 */
+		sprintf (pattern, ".earth_%s", DEM_share_SRTM[k]);
+		if ((c = strstr (file, pattern)) == NULL) continue;	/* No match */
+		if (strstr (file, "01s_g"))	/* Using 1 arc sec resolution */
+			*res = '1';
+		else if (strstr (file, "03s_g"))	/* Using 3 arc sec resolution */
+			*res = '3';
+		else
+			c = NULL;	/* Neither 1s or 3s */
+	}
 	return (c);	/* Returns pointer to this "extension" or NULL */
 }
 
@@ -1508,7 +1515,11 @@ int gmt_file_is_a_tile (struct GMTAPI_CTRL *API, const char *infile, unsigned in
 GMT_LOCAL bool gmtremote_is_earth_dem (struct GMT_DATA_INFO *I) {
 	/* Returns true if this data set is one of the earth_relief clones that must share SRTM tiles with @earth_relief.
 	 * Should we add more such DEMs then just add more cases like the synbath test */
-	if (strstr (I->tag, "synbath") && (!strcmp (I->inc, "03s") || !strcmp (I->inc, "01s"))) return true;
+	int k = -1;
+	if (strcmp (I->inc, "03s") && strcmp (I->inc, "01s")) return false;	/* Neither 3s or 1s resolution */
+	while (DEM_share_SRTM[++k]) {	/* OK, of right resolution, check if one of the known DEMs */
+		if (strstr (I->tag, DEM_share_SRTM[k])) return true;	/* Yep, return true */
+	}
 	return false;
 }
 
