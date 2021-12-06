@@ -65,9 +65,6 @@ enum GMT_tile_coverage {	/* Values in any tile coverage grid (e.g., srtm_tiles.n
 	GMT_FULL_TILE    = 2	/* There is complete coverage on land */
 };
 
-/* List of remote DEMs taht all share the same SRTM tiles as earth_relief */
-static char *DEM_share_SRTM[] = {"synbath", "gebco", "gebcosi", NULL};
-
 #define GMT_SRTM_ONLY	1	/* Mode so that when srtm_relief* is used we do not blend in earth_relief_15s */
 
 #define GMT_HASH_SERVER_FILE "gmt_hash_server.txt"

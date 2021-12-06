@@ -983,30 +983,35 @@ void gmt_refresh_server (struct GMTAPI_CTRL *API) {
 	}
 }
 
-GMT_LOCAL char * gmtremote_switch_to_srtm (char *file, char *res) {
+GMT_LOCAL bool gmtremote_is_earth_dem (struct GMT_DATA_INFO *I) {
+	/* Returns true if this data set is one of the earth_relief clones that must share SRTM tiles with @earth_relief. */
+	if (strcmp (I->inc, "03s") && strcmp (I->inc, "01s")) return false;	/* Neither 3s or 1s resolution */
+	return (strcmp (I->coverage, "srtm_tiles.nc") == 0);	/* Return true if coverage is using the SRTM tiles */
+}
+
+GMT_LOCAL char * gmtremote_switch_to_srtm (char *file, struct GMT_DATA_INFO *I, char *res) {
 	/* There may be more than one remote Earth DEM product that needs to share the
 	 * same 1x1 degree SRTM tiles.  This function handles this overlap; add more cases to gmt_remote.h f needed. */
-	char *c = NULL, pattern[GMT_LEN64] = {""};
-	int k = -1;
-	while (c == NULL && DEM_share_SRTM[++k]) {	/* Increments up front so -1 because 0 */
-		sprintf (pattern, ".earth_%s", DEM_share_SRTM[k]);
-		if ((c = strstr (file, pattern)) == NULL) continue;	/* No match */
-		if (strstr (file, "01s_g"))	/* Using 1 arc sec resolution */
-			*res = '1';
-		else if (strstr (file, "03s_g"))	/* Using 3 arc sec resolution */
-			*res = '3';
-		else
-			c = NULL;	/* Neither 1s or 3s */
-	}
+	char *c = NULL;
+	if (!gmtremote_is_earth_dem (I)) return NULL;
+	if (I->coverage[0] == '\0' || strcmp (I->coverage, "srtm_tiles.nc")) return NULL;	/* None of those files */
+	/* Here we know we have a file that is one of the DEMs that use SRTM tiles at 1s and 3s */
+	if ((c = strstr (file, ".earth_")) == NULL) return NULL;	/* Should not happen but good sanity check */
+	if (strstr (file, "01s_g"))	/* Using 1 arc sec resolution */
+		*res = '1';
+	else if (strstr (file, "03s_g"))	/* Using 3 arc sec resolution */
+		*res = '3';
+	else	/* Neither 1s or 3s */
+		c = NULL;
 	return (c);	/* Returns pointer to this "extension" or NULL */
 }
 
-GMT_LOCAL char * gmtremote_get_jp2_tilename (char *file) {
+GMT_LOCAL char * gmtremote_get_jp2_tilename (char *file, struct GMT_DATA_INFO *I) {
 	/* Must do special legacy checks for SRTMGL1|3 tag names for SRTM tiles.
 	 * We also strip off the leading @ since we are building an URL for curl  */
 	char res, *c = NULL, *new_file = NULL;
 	
-	if ((c = gmtremote_switch_to_srtm (file, &res))) {
+	if ((c = gmtremote_switch_to_srtm (file, I, &res))) {
 		/* Found one of the SRTM tile families, now replace the tag with SRTMGL1|3 */
 		char remote_name[GMT_LEN64] = {""};
 		c[0] = '\0';	/* Temporarily chop off tag and beyond */
@@ -1164,7 +1169,7 @@ int gmt_set_remote_and_local_filenames (struct GMT_CTRL *GMT, const char * file,
 not_local:	/* Get here if we failed to find a remote file already on disk */
 		/* Set remote path */
 		if (is_tile) {	/* Tile not yet downloaded, but must switch to .jp2 format on the server (and deal with legacy SRTM tile tags) */
-			jp2_file = gmtremote_get_jp2_tilename ((char *)file);
+			jp2_file = gmtremote_get_jp2_tilename ((char *)file, &API->remote_info[t_data]);
 			snprintf (remote_path, PATH_MAX, "%s%s%s%s", gmt_dataserver_url (API), GMT->parent->remote_info[t_data].dir, GMT->parent->remote_info[t_data].file, jp2_file);
 		}
 		else if (k_data == GMT_NOTSET) {	/* Cache file not yet downloaded */
@@ -1510,17 +1515,6 @@ int gmt_file_is_a_tile (struct GMTAPI_CTRL *API, const char *infile, unsigned in
 		sprintf (tag, "earth_relief_0%cs_g", p[7]);	/* 7th char in p is the 1|3 resolution character */
 	k_data = gmt_remote_dataset_id (API, tag);
 	return (k_data);
-}
-
-GMT_LOCAL bool gmtremote_is_earth_dem (struct GMT_DATA_INFO *I) {
-	/* Returns true if this data set is one of the earth_relief clones that must share SRTM tiles with @earth_relief.
-	 * Should we add more such DEMs then just add more cases like the synbath test */
-	int k = -1;
-	if (strcmp (I->inc, "03s") && strcmp (I->inc, "01s")) return false;	/* Neither 3s or 1s resolution */
-	while (DEM_share_SRTM[++k]) {	/* OK, of right resolution, check if one of the known DEMs */
-		if (strstr (I->tag, DEM_share_SRTM[k])) return true;	/* Yep, return true */
-	}
-	return false;
 }
 
 char ** gmt_get_dataset_tiles (struct GMTAPI_CTRL *API, double wesn_in[], int k_data, unsigned int *n_tiles, bool *need_filler) {
