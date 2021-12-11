@@ -37,7 +37,7 @@ Description
 -----------
 
 Makes legends that can be overlaid on maps. It reads
-specific legend-related information from an input file [or stdin].
+specific legend-related information from an input file [or standard input].
 Unless otherwise noted, annotations will be made using the primary
 annotation font and size in effect (i.e., :term:`FONT_ANNOT_PRIMARY`)
 
@@ -102,8 +102,8 @@ Optional Arguments
 **-M**
     Modern mode only: Read both (1) the hidden auto-generated legend information file created by
     plotting-modules' **-l** option and (2) additional information from input file(s) given on the
-    command line (or via *stdin*) [hidden file only].  For classic mode an input file must be
-    given or else we will read from *stdin*.
+    command line (or via standard input) [hidden file only].  For classic mode an input file must be
+    given or else we will read from standard input.
 
 .. |Add_-R| replace:: |Add_-R_links|
 .. include:: explain_-R.rst_
@@ -296,7 +296,7 @@ When attributes are not provided, or extended symbol information (for symbols ta
 not given as comma-separated quantities, we will provide the following defaults:
 
 Front: The *size* argument is *length*\ [/*gap*\ [*ticklength*]]. Front symbol is left-side (here, that means upper side) box,
-with *ticklength* set 30% of the given symbol *length (if not specified separately), and *gap* defaulting to -1 (one
+with *ticklength* set 30% of the given symbol *length* (if not specified separately), and *gap* defaulting to -1 (one
 entered front symbol) if not specified.  Modifiers to the symbol argument can be provided.
 
 Vector: Head size is 30% of given symbol size.

@@ -16884,7 +16884,7 @@ GMT_LOCAL double gmtsupport_cart_centroid_area (struct GMT_CTRL *GMT, const doub
 double gmt_centroid_area (struct GMT_CTRL *GMT, double x[], double y[], uint64_t n, int geo, double *pos) {
 	/* Estimate centroid and area of a polygon.  geo is 1 if geographic data. Input data remains unchanged.
 	 * area will be +ve if polygon is CW, negative if CCW */
-	double area;
+	double area;	/* In selected units squared if geographic */
 	if (geo)	/* Spherical centroid and area */
 		area = gmtlib_geo_centroid_area (GMT, x, y, n, pos);
 	else	/* Cartesian centroid and area */
@@ -17245,7 +17245,7 @@ unsigned int gmt_parse_array (struct GMT_CTRL *GMT, char option, char *argument,
 	 *	<file>
 	 *
 	 * Parsing:
-	 *      0) If <argument> is a single value and flags & GMT_ARRAY_SCALAR is set
+	 *	0) If <argument> is a single value and flags & GMT_ARRAY_SCALAR is set
 	 *	   then we create an array of one item. Otherwise <argument> may be
 	 *	   interpreted as <inc>.
 	 *	1) If <argument> is a file found in our search path then
@@ -17399,7 +17399,7 @@ unsigned int gmt_parse_array (struct GMT_CTRL *GMT, char option, char *argument,
 		GMT_Report (GMT->parent, GMT_MSG_ERROR, "Option %c: Must specify valid min/max/inc[<unit>|+n] option\n", option);
 		return GMT_PARSE_ERROR;
 	}
-	if (!(ns == 1 || ns == 3) && (flags & GMT_ARRAY_NOINC) == 0) {	/* Need to give 1 or 3 items unless inc is optional */
+	if ((flags & GMT_ARRAY_RANGE) == 0 && !(ns == 1 || ns == 3) && (flags & GMT_ARRAY_NOINC) == 0) {	/* Need to give 1 or 3 items unless inc is optional */
 		GMT_Report (GMT->parent, GMT_MSG_ERROR, "Option %c: Must specify valid [min/max/]inc[<unit>|+n] option\n", option);
 		return GMT_PARSE_ERROR;
 	}
@@ -17636,10 +17636,20 @@ unsigned int gmt_create_array (struct GMT_CTRL *GMT, char option, struct GMT_ARR
 		return GMT_NOERROR;
 	}
 
-	if (min != NULL)	/* Update min now */
+	if (min != NULL) {	/* Update min now */
+		if (gmt_M_is_dnan (*min)) {
+			GMT_Report (GMT->parent, GMT_MSG_ERROR, "Option %c: Min value is NaN - cannot create array\n", option);
+			return GMT_PARSE_ERROR;
+		}
 		T->min = *min;
-	if (max != NULL)	/* Update max now */
+	}
+	if (max != NULL) {	/* Update max now */
+		if (gmt_M_is_dnan (*max)) {
+			GMT_Report (GMT->parent, GMT_MSG_ERROR, "Option %c: Max value is NaN - cannot create array\n", option);
+			return GMT_PARSE_ERROR;
+		}
 		T->max = *max;
+	}
 	if (T->count)	/* This means we gave a count instead of increment  */
 		inc = (T->max - T->min) / (T->inc - 1.0);
 	else if (T->reciprocal)	/* This means we gave the reciprocal increment  */
@@ -18344,8 +18354,8 @@ int gmt_token_check (struct GMT_CTRL *GMT, FILE *fp, char *prefix, unsigned int 
 					GMT_Report (GMT->parent, GMT_MSG_WARNING, "Main script appears to have a deprecated sub-shell call `...`, please use $(...) instead: %s", start);
 				else if (strchr (line, ')') && (p = strchr (line, '('))) {	/* sub-shell call without leading $ */
 					prev = p - 1;	/* Get previous character */
-					if (prev < start || prev[0] != '$')
-						GMT_Report (GMT->parent, GMT_MSG_WARNING, "Main script appears to have a sub-shell call $(...) without the leading $: %s", start);
+					if (strchr (line, '\"') == NULL && (prev < start || prev[0] != '$'))	/* No double-quotes yet we have ( ...) and no leading $.Give this message: */
+						GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "Main script appears to have a sub-shell call $(...) without the leading $: %s", start);
 				}
 			}
 		}
@@ -18365,7 +18375,7 @@ int gmt_token_check (struct GMT_CTRL *GMT, FILE *fp, char *prefix, unsigned int 
 			}
 			else if (mode != GMT_DOS_MODE) {
 				if (strchr (start, '{') && !strchr (start, '}'))
-					GMT_Report (GMT->parent, GMT_MSG_ERROR, "Main script missing  in variable name: %s", record), n_errors++;
+					GMT_Report (GMT->parent, GMT_MSG_ERROR, "Main script missing } in variable name: %s", record), n_errors++;
 				else if (!strchr (start, '{') && strchr (start, '}'))
 					GMT_Report (GMT->parent, GMT_MSG_ERROR, "Main script missing { in variable name: %s", record), n_errors++;
 			}
