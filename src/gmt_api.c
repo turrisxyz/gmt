@@ -8293,6 +8293,31 @@ struct GMTAPI_CTRL * GMT_Create_Session_ (const char *tag, unsigned int *pad, un
 
 /*! ===>  Destroy a registered GMT Session */
 
+#ifdef FREE_SESSIONS
+int gmtapi_free_dead_sessions (struct GMTAPI_CTRL *API) {
+    /* Look for session dirs associated with non-active processes and delete them */
+#ifndef WIN32
+    int d = 0, ret, pid;
+    char **subdir = NULL, dir[PATH_MAX] = {""};
+
+    if ((subdir = gmtlib_get_dirs (API->GMT, API->session_dir)) == NULL) return GMT_NOERROR;    /* Nothing */
+    while (subdir[d]) { /* Examine PIDs  */
+        sscanf (subdir[d], "%*s.%d", &pid);
+        if ((ret = kill (pid, 0)) == GMT_NOTSET && errno == ESRCH) {    /* Found a non-active process */
+            snprintf (dir, PATH_MAX, "%s/%s", API->session_dir, subdir[d]);
+            if (gmt_remove_dir (API, dir, false))
+                GMT_Report (API, GMT_MSG_WARNING, "Unable to remove session directory %s [permissions?]\n", dir);
+            else
+                GMT_Report (API, GMT_MSG_NOTICE, "Removed unused session directory %s\n", dir);
+        }
+        d++;
+    }
+    gmtlib_free_dir_list (API->GMT, &subdir);
+#endif
+    return GMT_NOERROR;
+}
+#endif
+
 int GMT_Destroy_Session (void *V_API) {
 	/* GMT_Destroy_Session terminates the information for the specified session and frees all memory.
 	 * Returns false if all is well and true if there were errors. */
@@ -8303,6 +8328,10 @@ int GMT_Destroy_Session (void *V_API) {
 
 	if (API == NULL) return_error (API, GMT_NOT_A_SESSION);	/* GMT_Create_Session has not been called */
 	API->error = GMT_NOERROR;
+
+#ifdef FREE_SESSIONS
+    gmtapi_free_dead_sessions (API);
+#endif
 
 	GMT_Report (API, GMT_MSG_DEBUG, "Entering GMT_Destroy_Session\n");
 	module = strdup (API->GMT->init.module_name);	/* Need a copy as the pointer to static memory in library will close soon */
