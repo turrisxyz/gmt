@@ -2055,13 +2055,12 @@ GMT_LOCAL int gmtapi_init_image (struct GMTAPI_CTRL *API, struct GMT_OPTION *opt
 }
 
 /*! . */
-GMT_LOCAL int gmtapi_init_matrix (struct GMTAPI_CTRL *API, uint64_t dim[], double *range, double *inc, int registration, unsigned int mode, unsigned int direction, struct GMT_MATRIX *M) {
+GMT_LOCAL int gmtapi_init_matrix (struct GMTAPI_CTRL *API, unsigned int family, uint64_t dim[], double *range, double *inc, int registration, unsigned int mode, unsigned int direction, struct GMT_MATRIX *M) {
 	/* If range = inc = NULL then add dimensioning is set via dim: ncols, nrow, nlayers, type.
 	 * else, ncols,nrows is set via range and inc and registration. dim, if not null, sets dim[2] = nlayers [1] and dim[3] = type [double]
 	 */
 	int error;
-	unsigned int dims = (M->n_layers > 1) ? 3 : 2;
-	size_t size = 0;
+	unsigned int dims = (M->n_layers > 1 && family == GMT_IS_GRID) ? 3 : 2;    /* 3-D matrix vs multilayer image or regular grid */
 	struct GMT_MATRIX_HIDDEN *MH = gmt_get_M_hidden (M);
 
 	GMT_Report (API, GMT_MSG_DEBUG, "Initializing a matrix for handing external %s [mode = %u]\n", GMT_direction[direction], mode);
@@ -2099,9 +2098,11 @@ GMT_LOCAL int gmtapi_init_matrix (struct GMTAPI_CTRL *API, uint64_t dim[], doubl
 	M->type = (dim == NULL) ? API->GMT->current.setting.export_type : dim[3];	/* Use selected data type for export or default to GMT setting */
 	M->dim = (M->shape == GMT_IS_ROW_FORMAT) ? M->n_columns : M->n_rows;
 	M->registration = registration;
-	size = M->n_rows * M->n_columns * ((size_t)M->n_layers);	/* Size of the initial matrix allocation (number of elements) */
 	MH->grdtype = gmtlib_get_matrixtype (API->GMT, direction, M);
 	if ((mode & GMT_CONTAINER_ONLY) == 0) {	/* Must allocate data memory */
+		size_t size;
+		M->size = M->n_rows * M->n_columns;	/* Size is always the dimension of one layer in a 3-D matrix or an image band, and no pad */
+		size = M->size * ((size_t)M->n_layers);    /* Size of the initial matrix allocation (number of elements) */
 		if (size) {	/* Must allocate data matrix and possibly string array */
 			if ((error = gmtlib_alloc_univector (API->GMT, &(M->data), M->type, size)) != GMT_NOERROR)
 				return (error);
@@ -4604,6 +4605,16 @@ void gmtlib_GDALDestroyDriverManager (struct GMTAPI_CTRL *API) {
 }
 #endif
 
+GMT_LOCAL unsigned int gmtapi_maybe_add_via_method (struct GMTAPI_DATA_OBJECT *S_obj) {
+	/* Echo back the method but add the appropriate VIA mechanism if needed */
+	unsigned int method = S_obj->method;	/* The method on record */
+	if (S_obj->family != S_obj->actual_family) {	/* Adjust the method since item is passed via a vector or matrix */
+		if (S_obj->actual_family == GMT_IS_MATRIX) method |= GMT_VIA_MATRIX;	/* Adjust the method since item is passed as a matrix */
+		if (S_obj->actual_family == GMT_IS_VECTOR) method |= GMT_VIA_VECTOR;	/* Adjust the method since item is passed as a vector */
+	}
+	return method;
+}
+
 /*! . */
 GMT_LOCAL struct GMT_IMAGE *gmtapi_import_image (struct GMTAPI_CTRL *API, int object_ID, unsigned int mode, struct GMT_IMAGE *image) {
 	/* Handles the reading of a 2-D image given in one of several ways.
@@ -4619,7 +4630,7 @@ GMT_LOCAL struct GMT_IMAGE *gmtapi_import_image (struct GMTAPI_CTRL *API, int ob
 	int item, new_item, new_ID;
 	bool done = true, via = false, must_be_image = true, no_index = false, bc_not_set = true;
 	uint64_t i0, i1, j0, j1, ij, ij_orig, row, col;
-	unsigned int both_set = (GMT_CONTAINER_ONLY | GMT_DATA_ONLY);
+	unsigned int both_set = (GMT_CONTAINER_ONLY | GMT_DATA_ONLY), method;
 	double dx, dy, d;
 	p_func_uint64_t GMT_2D_to_index = NULL;
 	GMT_getfunction api_get_val = NULL;
@@ -4654,7 +4665,9 @@ GMT_LOCAL struct GMT_IMAGE *gmtapi_import_image (struct GMTAPI_CTRL *API, int ob
 		must_be_image = false;
 	}
 
-	switch (S_obj->method) {
+	method = gmtapi_maybe_add_via_method (S_obj);	/* Adjust the method if image is passed as a matrix */
+
+	switch (method) {
 		case GMT_IS_FILE:	/* Name of an image file on disk */
 #ifdef HAVE_GDAL
 			if (image == NULL) {	/* Only allocate image struct when not already allocated */
@@ -4798,13 +4811,18 @@ GMT_LOCAL struct GMT_IMAGE *gmtapi_import_image (struct GMTAPI_CTRL *API, int ob
 			break;
 
 	 	case GMT_IS_DUPLICATE|GMT_VIA_MATRIX:	/* The user's 2-D image array of some sort, + info in the args [NOT YET FULLY TESTED] */
+			GMT_Report (API, GMT_MSG_ERROR, "Import image via GMT_IS_DUPLICATE|GMT_VIA_MATRIX is not yet implemented\n");
+			return_null (API, GMT_NOT_A_VALID_METHOD);
 			if ((M_obj = S_obj->resource) == NULL) return_null (API, GMT_PTR_IS_NULL);
 			if (S_obj->region) return_null (API, GMT_SUBSET_NOT_ALLOWED);
+			gmt_set_pad (GMT, 0U); /* A matrix has no pad so image cannot have it either */
 			I_obj = (image == NULL) ? gmtlib_create_image (GMT) : image;	/* Only allocate when not already allocated */
+			gmt_set_pad (GMT, API->pad); /* Restore to GMT Defaults */
 			HH = gmt_get_H_hidden (I_obj->header);
 			I_obj->header->complex_mode = (mode & GMT_GRID_IS_COMPLEX_MASK);	/* Set the complex mode */
 			if (! (mode & GMT_DATA_ONLY)) {
 				gmtapi_matrixinfo_to_grdheader (GMT, I_obj->header, M_obj);	/* Populate a GRD header structure */
+				I_obj->header->n_bands = M_obj->n_layers;
 				if (mode & GMT_CONTAINER_ONLY) break;	/* Just needed the header */
 			}
 			IH = gmt_get_I_hidden (I_obj);
@@ -4812,11 +4830,14 @@ GMT_LOCAL struct GMT_IMAGE *gmtapi_import_image (struct GMTAPI_CTRL *API, int ob
 			/* Must convert to new array */
 			GMT_Report (API, GMT_MSG_INFORMATION, "Importing image data from user memory location\n");
 			gmt_set_grddim (GMT, I_obj->header);	/* Set all dimensions */
+			if (M_obj->n_layers%2)
+				I_obj->header->mem_layout[3] = '\0';	/* No alpha here */
 			I_obj->data = gmt_M_memory (GMT, NULL, I_obj->header->size, unsigned char);
 			if ((GMT_2D_to_index = gmtapi_get_2d_to_index (API, M_obj->shape, GMT_GRID_IS_REAL)) == NULL)
 				return_null (API, GMT_WRONG_MATRIX_SHAPE);
 			if ((api_get_val = gmtapi_select_get_function (API, M_obj->type)) == NULL)
 				return_null (API, GMT_NOT_A_VALID_TYPE);
+			/* THIS METHOD IS MISSING A LOOP OVER LAYERS */
 			gmt_M_grd_loop (GMT, I_obj, row, col, ij) {
 				ij_orig = GMT_2D_to_index (row, col, M_obj->dim);
 				api_get_val (&(M_obj->data), ij_orig, &d);
@@ -4843,20 +4864,29 @@ GMT_LOCAL struct GMT_IMAGE *gmtapi_import_image (struct GMTAPI_CTRL *API, int ob
 	 	case GMT_IS_REFERENCE|GMT_VIA_MATRIX:	/* The user's 2-D image array of some sort, + info in the args [NOT YET FULLY TESTED] */
 			if ((M_obj = S_obj->resource) == NULL) return_null (API, GMT_PTR_IS_NULL);
 			if (S_obj->region) return_null (API, GMT_SUBSET_NOT_ALLOWED);
+			gmt_set_pad (GMT, 0U); /* A matrix has no pad so image cannot have it either */
 			I_obj = (image == NULL) ? gmtlib_create_image (GMT) : image;	/* Only allocate when not already allocated */
+			gmt_set_pad (GMT, API->pad); /* Restore to GMT Defaults */
 			HH = gmt_get_H_hidden (I_obj->header);
 			I_obj->header->complex_mode = (mode & GMT_GRID_IS_COMPLEX_MASK);	/* Set the complex mode */
 			if (! (mode & GMT_DATA_ONLY)) {
-				gmtapi_matrixinfo_to_grdheader (GMT, I_obj->header, M_obj);	/* Populate a GRD header structure */
+				gmtapi_matrixinfo_to_grdheader (GMT, I_obj->header, M_obj);	/* Populate the image header structure */
+				I_obj->header->n_bands = M_obj->n_layers;	/* Indicate tetheh number of bands */
 				if (mode & GMT_CONTAINER_ONLY) break;	/* Just needed the header */
 			}
 			MH = gmt_get_M_hidden (M_obj);
-			if (!(M_obj->shape == GMT_IS_ROW_FORMAT && M_obj->type == GMT_FLOAT && MH->alloc_mode == GMT_ALLOC_EXTERNALLY && (mode & GMT_GRID_IS_COMPLEX_MASK))) {
+			/* For passing by reference we requires a matrix in row-format, with unsigned chars, and no complex components */
+			if (!(M_obj->shape == GMT_IS_ROW_FORMAT && M_obj->type == GMT_UCHAR && I_obj->header->complex_mode == 0)) {
 				return_null (API, GMT_NOT_A_VALID_IO_ACCESS);
 			}
 			GMT_Report (API, GMT_MSG_INFORMATION, "Referencing image data from user memory location\n");
 			IH = gmt_get_I_hidden (I_obj);
-			I_obj->data = (unsigned char *)(M_obj->data.sc1);
+			memcpy (I_obj->header->mem_layout, "TRPa", 4U);
+			I_obj->data = (unsigned char *)(M_obj->data.sc1);	/* Pass read-only memory as is */
+			if (M_obj->n_layers%2)	/* No alpha layer was passed here */
+				I_obj->header->mem_layout[3] = '\0';
+			else
+				I_obj->alpha = (unsigned char *)(&M_obj->data.sc1[M_obj->n_layers*M_obj->size]);	/* Pass read-only memory pointer to start of alpha */
 			S_obj->alloc_mode = MH->alloc_mode;	/* Pass on allocation mode of matrix */
 			IH->alloc_mode = MH->alloc_mode;
 			if (!gmtapi_adjust_grdpadding (I_obj->header, GMT->current.io.pad)) break;	/* Pad is correct so we are done */
@@ -11237,7 +11267,7 @@ void * GMT_Create_Data (void *V_API, unsigned int family, unsigned int geometry,
 			if (data) return_null (API, GMT_PTR_NOT_NULL);	/* Error if data is not NULL */
 			n_layers = (this_dim == NULL || (this_dim[GMTAPI_DIM_COL] == 0 && this_dim[GMTAPI_DIM_ROW] == 0)) ? 1U : this_dim[GMT_Z];	/* Only by specifying nx,ny dimension might there be > 1 layer */
 		 	new_obj = gmtlib_create_matrix (API->GMT, n_layers, def_direction, pad);
-			if ((API->error = gmtapi_init_matrix (API, this_dim, range, inc, registration, mode, def_direction, new_obj))) {	/* Failure, must free the object */
+			if ((API->error = gmtapi_init_matrix (API, family, this_dim, range, inc, registration, mode, def_direction, new_obj))) {	/* Failure, must free the object */
 				struct GMT_MATRIX *M = gmtapi_return_address (new_obj, GMT_IS_MATRIX);	/* Get pointer to resource */
 				gmtlib_free_matrix (API->GMT, &M, true);
 		 		return_null (API, GMT_MEMORY_ERROR);	/* Allocation error */
