@@ -66,20 +66,33 @@ Required Arguments
 
 **-C**\ *canvassize*
     Specify the canvas size used when composing the movie frames. You can choose from a
-    set of preset formats or specify a custom layout.  The named 16:9 ratio
-    formats have a canvas dimension of 24 x 13.5 cm *or* 9.6 x 5.4 inch and are
-    (with pixel dimensions given in parenthesis):
-    **4320p** (7680 x 4320), **2160p** (3840 x 2160), **1080p** (1920 x 1080), **720p** (1280 x 720),
-    **540p** (960 x 540), **480p** (854 x 480), **360p** (640 x 360), and **240p** (426 x 240).
-    We also accept **8k** or **uhd-2** to mean **4320p**, **4k** or **uhd** to mean **2160p**, and **hd** to mean **1080p**.
-    The recognized 4:3 ratio formats have a canvas dimension of 24 x 18 cm *or* 9.6 x 7.2 inch
-    and are (with pixel dimensions given in parenthesis):
-    **uxga** (1600 x 1200), **sxga+** (1400 x 1050), **xga** (1024 x 768),
-    **svga** (800 x 600), and **dvd** (640 x 480).
+    set of preset formats (see Table :ref:`Presets <tbl-presets>`) or specify a custom layout.
     **Note**: Your :term:`PROJ_LENGTH_UNIT` setting determines if **movie** sets
     you up to work with the SI or US canvas dimensions.  Instead of a named format you can
     request a custom format directly by giving *width*\ x\ *height*\ x\ *dpu*,
     where *dpu* is the dots-per-unit pixel density (pixel density is set automatically for the named formats).
+    
+    .. _tbl-presets:
+
+    =================================== ================
+    Preset format (alias)               Pixel dimensions
+    =================================== ================
+    *16:9 (24x13.5 cm or 9.6x5.4 inch)*
+    4320p (8k and uhd-2)                7680 x 4320
+    2160p (4k and uhd)                  3840 x 2160
+    1080p (hd)                          1920 x 1080
+    720p                                1280 x 720
+    540p                                960 x 540
+    480p                                854 x 480
+    360p                                640 x 360
+    240p                                426 x 240
+    *4:3 (24x18 cm or 9.6x7.2 inch)*
+    uxga                                1600 x 1200
+    sxga+                               1400 x 1050
+    xga                                 1024 x 768
+    svga                                800 x 600
+    dvd                                 640 x 480
+    =================================== ================
 
 .. _-N:
 
@@ -107,7 +120,8 @@ Required Arguments
     the numbering of the given frames.  Finally, **+p** can be used to set the tag *width* of the format
     used in naming frames.  For instance, name_000010.png has a tag width of 6.  By default, this
     is automatically set but if you are splitting large jobs across several computers then you
-    must use the same tag width for all names.
+    must use the same tag width for all names. **Note**: If just *nframes* is given then only **MOVIE_FRAME**
+    is available as no data file is available.
 
 
 Optional Arguments
@@ -122,7 +136,7 @@ Optional Arguments
 
 **-E**\ *titlepage*\ [**+d**\ *duration*\ [**s**]][**+f**\ [**i**\|\ **o**]\ *fade*\ [**s**]]\ [**+g**\ *fill*]
     Give a *titlepage* script that creates a static title page for the movie [no title].
-    Alternatively, *titlepage* can be a *PostScript* plot (file extension .ps) of dimensions exactly matching
+    Alternatively, *titlepage* can be a *PostScript* or *EPS* plot (file extension .ps) of dimensions exactly matching
     the canvas size set in **-C**. You control the duration of the title sequence with **+d** and specify
     the number of frames (or append **s** for a duration in seconds instead) [4s].
     Optionally, supply the fade length via **+f**\ *fade* (in frames or seconds [1s]) as well [no fading];
@@ -250,7 +264,7 @@ Optional Arguments
     to make the movie, and (2) It may make a static background plot that should form the background for all frames.
     If a plot is generated the script must make sure it uses the same positioning (i.e., **-X -Y**) as the main script
     so that the layered plot will stack correctly (unless you actually want a different offset).  Alternatively,
-    *background* can be a *PostScript* plot layer of dimensions exactly matching the canvas size.
+    *background* can be a *PostScript* or *EPS* plot layer of dimensions exactly matching the canvas size.
 
 .. _-Sf:
 
@@ -258,7 +272,7 @@ Optional Arguments
     The optional GMT modern mode *foreground* (written in the same scripting language as *mainscript*) can be
     used to make a static foreground plot that should be overlain on all frames.  Make sure the script uses the same
     positioning (i.e., **-X -Y**) as the main script so that the layers will stack correctly.  Alternatively,
-    *foreground* can be a *PostScript* plot layer of dimensions exactly matching the canvas size.
+    *foreground* can be a *PostScript* or *EPS* plot layer of dimensions exactly matching the canvas size.
 
 .. |Add_-V| replace:: |Add_-V_links|
 .. include:: explain_-V.rst_
@@ -292,7 +306,8 @@ Optional Arguments
     By default we try to use all available cores.  Append *n* to only use *n* cores
     (if too large it will be truncated to the maximum cores available).  Finally,
     give a negative *n* to select (all - *n*) cores (or at least 1 if *n* equals or exceeds all).
-    The parallel processing does not depend on OpenMP.
+    The parallel processing does not depend on OpenMP. **Note**: One core is utilized by
+    **movie** so in effect *n-1* cores are used for the individual frames.
 
 .. include:: explain_help.rst_
 
@@ -310,8 +325,8 @@ and those that change with the frame number.  The constants are accessible by al
 Also, if **-I** was used then any static parameters listed there will be available to all the scripts as well.
 In addition, the *mainscript* also has access to parameters that vary with the frame counter:
 **MOVIE_FRAME**\ : The current frame number (an integer, e.g., 136),
-**MOVIE_TAG**\ : The formatted frame number (a string, e.g., 000136), and
-**MOVIE_NAME**\ : The name prefix for the current frame (i.e., *prefix*\ _\ **MOVIE_TAG**),
+**MOVIE_ITEM**\ : The formatted frame number (a string, e.g., 000136), and
+**MOVIE_NAME**\ : The name prefix for the current frame (i.e., *prefix*\ _\ **MOVIE_ITEM**),
 Furthermore, if a *timefile* was given then variables **MOVIE_COL0**\ , **MOVIE_COL1**\ , etc. are
 also set, yielding one variable per column in *timefile*.  If *timefile* has trailing text then that text can
 be accessed via the variable **MOVIE_TEXT**, and if word-splitting was explicitly requested by **-T+w** or
@@ -429,6 +444,18 @@ Multi-treaded GMT modules will therefore be limited to a single core as well.
 The conversion of PNG frames to an animated GIF (**-F**\ *gif*) relies on `GraphicsMagick <http://www.graphicsmagick.org/>`_.
 Thus, **gm** must be accessible via your standard search path. Likewise, the conversion of
 PNG frames to an MP4 (**-F**\ *mp4*) or WebM (**-F**\ *webm*) movie relies on `FFmpeg <https://www.ffmpeg.org/>`_.
+
+Shell Limitations
+-----------------
+
+As we cannot control how a shell (e.g., bash or csh) implements piping between two processes (it often
+involves a sub-shell), we advice against using commands in your main script that involve piping the result
+from one GMT module into another (e.g., gmt blockmean ..... | gmt surface ...).  Because **movie** is running
+many instances of your main script simultaneously, odd things can happen when sub-shells are involved.
+In our experience, piping in the context of movie script may corrupt the GMT history files, resulting in
+stray messages from some frames, such as region not set, etc.  Split such pipe constructs into two using
+a temporary file when writing movie main scripts. **Note**: Piping from a non-GMT module into a GMT module
+or vice versa is not a problem (e.g., echo ..... | gmt plot ...).
 
 Hints for Movie Makers
 ----------------------
@@ -589,11 +616,25 @@ Adding an Audio Track
 
 If you wish to add an *audio* track to the animation, say a narration that explains your animation,
 you can record your audio using a suitable tool and save it to a \*.mp3 or \*.m4a file.  The audio track
-should be approximately the same length as the video.  Then, simply combine the two with FFMpeg::
+should be approximately the same length as the video.  Then, simply combine the two with FFmpeg::
 
-    ffmpeg -loglevel warning -i yourslientmovie.mp4 -i narration.m4a final.mp4
+    ffmpeg -loglevel warning -i yourslientmovie.mp4 -y -i narration.m4a final.mp4
 
 For more information on audio manipulations, see the FFmpeg documentation.
+
+Deprecations
+------------
+
+- 6.3.0: Consolidate -A into -F for a more unified option. `#5613 <https://github.com/GenericMappingTools/gmt/pull/5613>`_
+
+macOS Issues
+------------
+
+**Note**: The limit on the number of concurrently open files is relatively small by default on macOS and when building
+numerous frames at the same time it is not unusual to get failures in **movie** jobs with the message "Too many open files". 
+We refer you to this helpful
+`article <https://superuser.com/questions/433746/is-there-a-fix-for-the-too-many-open-files-in-system-error-on-os-x-10-7-1>`_
+for various solutions. 
 
 See Also
 --------

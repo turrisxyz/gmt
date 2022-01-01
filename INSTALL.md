@@ -83,8 +83,9 @@ version requires a computer with the M1 Apple Silicon chip.
 | **GMT Version** | **Minimum MacOS** |
 |-------------|-------------|
 | 6.2         | macOS 10.15 |
-| 6.1         | macOS 10.12 |
-| 6.0         | macOS 10.12 |
+| 6.1.1       | macOS 10.15 |
+| 6.1.0       | macOS 10.15 |
+| 6.0.0       | macOS 10.13 |
 | 5.4         | macOS 10.12 |
 
 ### Install via Homebrew
@@ -203,8 +204,12 @@ Install other GMT dependencies (some are optional) via:
 
 ### ArchLinux
 
-ArchLinux official repository doesn't provide GMT packages, but AUR (ArchLinux User Repository) does.
-You can follow the [Install latest GMT on ArchLinux](https://github.com/GenericMappingTools/gmt/wiki/Install-latest-GMT-on-ArchLinux) in the wiki.
+Install GMT via:
+
+    sudo pacman -S gmt
+
+ArchLinux official repository doesn't provide GMT extra data yet, but AUR (ArchLinux User Repository) does.
+You can follow the [Install latest GMT on ArchLinux](https://github.com/GenericMappingTools/gmt/wiki/Install-latest-GMT-on-ArchLinux) in the wiki for those.
 
 ### Gentoo
 
@@ -212,7 +217,7 @@ You can follow the [Install latest GMT on ArchLinux](https://github.com/GenericM
 
 Install GMT via:
 
-    sudo emerge gmt
+    sudo emerge --verbose --ask sci-geosciences/gmt
 
 ## Cross Platform Install Instructions
 

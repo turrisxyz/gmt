@@ -90,31 +90,17 @@ struct PSCOUPE_CTRL {
 		bool active;
 		struct GMT_PEN pen;
 	} L;
-	struct PSCOUPE_M {	/* -M */
-		bool active;
-	} M;
 	struct PSCOUPE_N {	/* -N */
 		bool active;
 	} N;
 	struct PSCOUPE_Q {	/* -Q */
 		bool active;
 	} Q;
-	struct PSCOUPE_S {	/* -S<format>[<scale>][+a<angle>][+f<font>][+j<justify>][+o<dx>[/<dy>]] and -Fs */
-		bool active;
+	struct PSCOUPE_S {	/* -S<format>[<scale>][+a<angle>][+f<font>][+j<justify>][+l][+m][+o<dx>[/<dy>]][+s<ref>]  and -Fs */
+		#include "meca_symbol.h"
+	/* Extra parameters for coupe */
 		bool zerotrace;
-		bool no_label;
-		bool read;	/* True if no scale given; must be first column after the required ones */
-		unsigned int readmode;
-		unsigned int plotmode;
-		unsigned int n_cols;
 		int symbol;
-		char P_symbol, T_symbol;
-		double scale;
-		double angle;
-		int justify;
-		double offset[2];
-		struct GMT_FILL fill;
-		struct GMT_FONT font;
 	} S;
 	struct PSCOUPE_T {	/* -T<nplane>[/<pen>] */
 		bool active;
@@ -170,12 +156,13 @@ static void *New_Ctrl (struct GMT_CTRL *GMT) {	/* Allocate and initialize a new 
 	C->L.pen = C->T.pen = C->P2.pen = C->T2.pen = C->W.pen = GMT->current.setting.map_default_pen;
 	/* Set width temporarily to -1. This will indicate later that we need to replace by W.pen */
 	C->L.pen.width = C->T.pen.width = C->P2.pen.width = C->T2.pen.width = -1.0;
-	C->L.active = true;
+	//C->L.active = true;
 	gmt_init_fill (GMT, &C->E.fill, 1.0, 1.0, 1.0);
 	gmt_init_fill (GMT, &C->G.fill, 0.0, 0.0, 0.0);
 	C->S.font = GMT->current.setting.font_annot[GMT_PRIMARY];
 	C->S.font.size = DEFAULT_FONTSIZE;
 	C->S.justify = PSL_TC;
+	C->S.reference = SEIS_MAG_REFERENCE;
 	C->A2.size = DEFAULT_SYMBOL_SIZE * GMT->session.u2u[GMT_PT][GMT_INCH];
 	C->A2.P_symbol = C->A2.T_symbol = PSL_CIRCLE;
 	return (C);
@@ -450,9 +437,10 @@ static int usage (struct GMTAPI_CTRL *API, int level) {
 	struct GMT_FONT font;
 	const char *name = gmt_show_name_and_purpose (API, THIS_MODULE_LIB, THIS_MODULE_CLASSIC_NAME, THIS_MODULE_PURPOSE);
 	if (level == GMT_MODULE_PURPOSE) return (GMT_NOERROR);
-	GMT_Usage (API, 0, "usage: %s [<table>] -Aa|b|c|d<params>[+c[n|t]][+d<dip>][+r[a|e|<dx>]][+w<width>][+z[s]a|e|<dz>|<min>/<max>] %s %s -S<format>[<scale>][+a<angle>][+f<font>][+j<justify>][+o<dx>[/<dy>]] "
+	GMT_Usage (API, 0, "usage: %s [<table>] -Aa|b|c|d<params>[+c[n|t]][+d<dip>][+r[a|e|<dx>]][+w<width>][+z[s]a|e|<dz>|<min>/<max>] "
+		"%s %s -S<format>[<scale>][+a<angle>][+f<font>][+j<justify>][+l][+m][+o<dx>[/<dy>]][+s<ref>] "
 		"[%s] [-C<cpt>] [-E<fill>] [-Fa[<size>[/<Psymbol>[<Tsymbol>]]]] [-Fe<fill>] [-Fg<fill>] [-Fr<fill>] [-Fp[<pen>]] [-Ft[<pen>]] "
-		"[-Fs<symbol><size>] [-G<fill>] [-H[<scale>]] [-I[<intens>]] %s[-L<pen>] [-M] [-N] %s%s "
+		"[-Fs<symbol><size>] [-G<fill>] [-H[<scale>]] [-I[<intens>]] %s[-L<pen>] [-N] %s%s "
 		"[-Q] [-T<nplane>[/<pen>]] [%s] [%s] [-W<pen>] [%s] [%s] %s[%s] [%s] [%s] [%s] [%s] [%s] [%s] [%s] [%s]\n",
 		name, GMT_J_OPT, GMT_Rgeo_OPT, GMT_B_OPT, API->K_OPT, API->O_OPT, API->P_OPT, GMT_U_OPT, GMT_V_OPT, GMT_X_OPT, GMT_Y_OPT,
 		API->c_OPT, GMT_di_OPT, GMT_e_OPT, GMT_h_OPT, GMT_i_OPT, GMT_p_OPT, GMT_qi_OPT, GMT_tv_OPT, GMT_colon_OPT, GMT_PAR_OPT);
@@ -481,7 +469,7 @@ static int usage (struct GMTAPI_CTRL *API, int level) {
 	GMT_Usage (API, -2, "Note: <width>, <length>, <dx>, <dz>, <min> and <max> must all be given in km.");
 	GMT_Usage (API, -2, "Use CPT to assign colors based on depth-value in 3rd column.");
 	GMT_Option (API, "J-,R");
-	GMT_Usage (API, 1, "\n-S<format>[<scale>][+a<angle>][+f<font>][+j<justify>][+o<dx>[/<dy>]]");
+	GMT_Usage (API, 1, "\n-S<format>[<scale>][+a<angle>][+f<font>][+j<justify>][+l][+m][+o<dx>[/<dy>]][+s<ref>]");
 	GMT_Usage (API, -2, "Select format directive and optional symbol modifiers:");
 	GMT_Usage (API, 3, "a: Focal mechanism in Aki & Richard's convention:");
 	GMT_Usage (API, 4, "X Y depth strike dip rake mag [newX newY] [event_title].");
@@ -507,7 +495,10 @@ static int usage (struct GMTAPI_CTRL *API, int level) {
 	GMT_Usage (API, 3, "+a Set the label angle [0].");
 	GMT_Usage (API, 3, "+f Set font attributes for the label [%s].", gmt_putfont (API->GMT, &font));
 	GMT_Usage (API, 3, "+j Set the label <justification> [TC].");
+	GMT_Usage (API, 3, "+l Use linear symbol scaling based on moment [magnitude].");
+	GMT_Usage (API, 3, "+m Use <scale> as fixed size for any magnitude or moment.");
 	GMT_Usage (API, 3, "+o Set the label offset <dx>[/<dy>] [0/0].");
+	GMT_Usage (API, 3, "+s Set reference magnitude [%g] or moment [%ge%d] (if +l) for symbol size.", SEIS_MAG_REFERENCE, SEIS_MOMENT_MANT_REFERENCE, SEIS_MOMENT_EXP_REFERENCE);
 	GMT_Usage (API, -2, "Note: If fontsize = 0 (+f0) then no label written; offset is from the limit of the beach ball.");
 	GMT_Message (API, GMT_TIME_NONE, "\n  OPTIONAL ARGUMENTS:\n");
 	GMT_Option (API, "B-");
@@ -534,7 +525,6 @@ static int usage (struct GMTAPI_CTRL *API, int level) {
 	GMT_Option (API, "K");
 	GMT_Usage (API, 1, "\n-L<pen>");
 	GMT_Usage (API, -2, "Draw line or symbol outline using the current pen (see -W; or append alternative pen).");
-	GMT_Usage (API, 1, "\n-M Set same size for any magnitude. Size is given with -S.");
 	GMT_Usage (API, 1, "\n-N Do Not skip/clip symbols that fall outside map border [Default will ignore those outside].");
 	GMT_Option (API, "O,P");
 	GMT_Usage (API, 1, "\n-Q Do not print cross-section information to files.");
@@ -585,18 +575,20 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 	unsigned int n_errors = 0;
 	char txt_a[GMT_LEN256] = {""}, txt_b[GMT_LEN256] = {""}, txt_c[GMT_LEN256] = {""}, txt_d[GMT_LEN256] = {""}, *p = NULL;
 	struct GMT_OPTION *opt = NULL;
+	struct GMTAPI_CTRL *API = GMT->parent;
 
 	for (opt = options; opt; opt = opt->next) {	/* Process all the options given */
 
 		switch (opt->option) {
 
 			case '<':	/* Skip input files */
-				if (GMT_Get_FilePath (GMT->parent, GMT_IS_DATASET, GMT_IN, GMT_FILE_REMOTE, &(opt->arg))) n_errors++;;
+				if (GMT_Get_FilePath (API, GMT_IS_DATASET, GMT_IN, GMT_FILE_REMOTE, &(opt->arg))) n_errors++;;
 				break;
 
 			/* Processes program-specific parameters */
 
 			case 'A':	/* Cross-section definition */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->A.active);
 				Ctrl->A.active = true;
 				Ctrl->A.proj_type = opt->arg[0];
 				if (strstr (opt->arg, "+f") || gmt_count_char (GMT, opt->arg, '/') == 7)	/* Old deprecated syntax */
@@ -652,7 +644,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 					}
 					/* Process the first 4 args */
 					if (sscanf (&opt->arg[1], "%[^/]/%[^/]/%[^/]/%s", txt_a, txt_b, txt_c, txt_d) != 4) {
-						GMT_Report (GMT->parent, GMT_MSG_ERROR, "-A requires 4 arguments before modifiers.\n");
+						GMT_Report (API, GMT_MSG_ERROR, "-A requires 4 arguments before modifiers.\n");
 						n_errors++;
 					}
 					switch (Ctrl->A.proj_type) {
@@ -681,7 +673,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 							Ctrl->A.p_length = atof (txt_d);
 							break;
 						default:
-							GMT_Report (GMT->parent, GMT_MSG_ERROR, "Option -A: Unrecognized mode %c.\n", Ctrl->A.proj_type);
+							GMT_Report (API, GMT_MSG_ERROR, "Option -A: Unrecognized mode %c.\n", Ctrl->A.proj_type);
 							n_errors++;
 							break;
 					}
@@ -711,18 +703,20 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 
 			case 'Z':	/* Backwards compatibility */
 				if (gmt_M_compat_check (GMT, 6))
-					GMT_Report (GMT->parent, GMT_MSG_COMPAT, "-Z<cpt> is deprecated; use -C<cpt> instead.\n");
+					GMT_Report (API, GMT_MSG_COMPAT, "-Z<cpt> is deprecated; use -C<cpt> instead.\n");
 				else {	/* Hard error */
 					n_errors += gmt_default_error (GMT, opt->option);
 					continue;
 				}
 				/* Deliberate fall-through here (no break) */
 			case 'C':	/* Vary symbol color with z */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->C.active);
 				Ctrl->C.active = true;
 				if (opt->arg[0]) Ctrl->C.file = strdup (opt->arg);
 				break;
 
 			case 'E':	/* Set color for extensive parts  */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->E.active);
 				Ctrl->E.active = true;
 				if (!opt->arg[0] || (opt->arg[0] && gmt_getfill (GMT, opt->arg, &Ctrl->E.fill))) {
 					gmt_fill_syntax (GMT, 'E', NULL, " ");
@@ -731,6 +725,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 				Ctrl->A.polygon = true;
 				break;
 			case 'F':	/* Set various symbol parameters  */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->F.active);
 				Ctrl->F.active = true;
 				switch (opt->arg[0]) {
 					case 'a':	/* plot axis */
@@ -781,7 +776,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 					case 's':	/* Only points : get symbol [and size] */
 						Ctrl->S.active = true;
 						Ctrl->S.symbol = opt->arg[1];
-						if ((strstr (opt->arg, "+f")) || strstr (opt->arg, "+o") || strstr (opt->arg, "+j")) {
+						if (gmt_found_modifier (GMT, opt->arg, "fjo")) {
 							/* New syntax: -Fs<symbol>[<size>]+f<font>+o<dx>/<dy>+j<justify> */
 							char word[GMT_LEN256] = {""}, *c = NULL;
 
@@ -792,8 +787,12 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 
 							if (gmt_get_modifier (opt->arg, 'j', word) && strchr ("LCRBMT", word[0]) && strchr ("LCRBMT", word[1]))
 								Ctrl->S.justify = gmt_just_decode (GMT, word, Ctrl->S.justify);
-							if (gmt_get_modifier (opt->arg, 'f', word))
-								n_errors += gmt_getfont (GMT, word, &(Ctrl->S.font));
+							if (gmt_get_modifier (opt->arg, 'f', word)) {
+								if (word[0] == '-' || (word[0] == '0' && (word[1] == '\0' || word[1] == 'p')))
+									Ctrl->S.font.size = 0.0;
+								else
+									n_errors += gmt_getfont (GMT, word, &(Ctrl->S.font));
+							}
 							if (gmt_get_modifier (opt->arg, 'o', word)) {
 								if (gmt_get_pair (GMT, word, GMT_PAIR_DIM_DUP, Ctrl->S.offset) < 0) n_errors++;
 							} else {	/* Set default offset */
@@ -833,6 +832,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 				}
 				break;
 			case 'G':	/* Set color for compressive parts */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->G.active);
 				Ctrl->G.active = true;
 				if (!opt->arg[0] || (opt->arg[0] && gmt_getfill (GMT, opt->arg, &Ctrl->G.fill))) {
 					gmt_fill_syntax (GMT, 'G', NULL, " ");
@@ -841,6 +841,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 				Ctrl->A.polygon = true;
 				break;
 			case 'H':		/* Overall symbol/pen scale column provided */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->H.active);
 				Ctrl->H.active = true;
 				if (opt->arg[0]) {	/* Gave a fixed scale - no reading from file */
 					Ctrl->H.value = atof (opt->arg);
@@ -848,6 +849,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 				}
 				break;
 			case 'I':	/* Adjust symbol color via intensity */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->I.active);
 				Ctrl->I.active = true;
 				if (opt->arg[0])
 					Ctrl->I.value = atof (opt->arg);
@@ -855,22 +857,31 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 					Ctrl->I.mode = 1;
 				break;
 			case 'L':	/* Draw outline [set outline attributes] */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->L.active);
 				Ctrl->L.active = true;
 				if (opt->arg[0] && gmt_getpen (GMT, opt->arg, &Ctrl->L.pen)) {
 					gmt_pen_syntax (GMT, 'L', NULL, " ", NULL, 0);
 					n_errors++;
 				}
 				break;
-			case 'M':	/* Same size for any magnitude */
-				Ctrl->M.active = true;
+			case 'M':	/* Same size for any magnitude [Deprecated 8/14/2021 6.3.0 - use -S+m instead] */
+				if (gmt_M_compat_check (GMT, 6)) {
+					GMT_Report (API, GMT_MSG_COMPAT, "-M is deprecated from 6.3.0; use -S modifier +m instead.\n");
+					Ctrl->S.fixed = true;
+				}
+				else
+					n_errors += gmt_default_error (GMT, opt->option);
 				break;
 			case 'N':	/* Do not skip points outside border */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->N.active);
 				Ctrl->N.active = true;
 				break;
 			case 'Q':	/* Switch of production of mechanism files */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->Q.active);
 				Ctrl->Q.active = true;
 				break;
 			case 'S':	/* Mechanisms : get format [and size] */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->S.active);
 				Ctrl->S.active = true;
 				switch (opt->arg[0]) {	/* parse format */
 					case 'c':
@@ -917,11 +928,11 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 						break;
 				}
 
-				if ((strstr (opt->arg, "+a")) || (strstr (opt->arg, "+f")) || strstr (opt->arg, "+o") || strstr (opt->arg, "+j")) {
-					/* New syntax: -S<format><scale>+a<angle>+f<font>+o<dx>/<dy>+j<justify> */
+				if (gmt_found_modifier (GMT, opt->arg, "afjlmos")) {
+					/* New syntax: -S<format>[<scale>][+a<angle>][+f<font>][+j<justify>][+l][+m][+o<dx>[/<dy>]][+s<ref>] */
 					char word[GMT_LEN256] = {""}, *c = NULL;
 
-					/* parse beachball size */
+					/* Parse beachball size */
 					if ((c = strchr (opt->arg, '+'))) c[0] = '\0';	/* Chop off modifiers for now */
 					Ctrl->S.scale = gmt_M_to_inch (GMT, &opt->arg[1]);
 					if (c) c[0] = '+';	/* Restore modifiers */
@@ -931,7 +942,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 					if (gmt_get_modifier (opt->arg, 'j', word) && strchr ("LCRBMT", word[0]) && strchr ("LCRBMT", word[1]))
 						Ctrl->S.justify = gmt_just_decode (GMT, word, Ctrl->S.justify);
 					if (gmt_get_modifier (opt->arg, 'f', word)) {
-						if (word[0] == '0' && (word[1] == '\0' || word[1] == 'p'))
+						if (word[0] == '-' || (word[0] == '0' && (word[1] == '\0' || word[1] == 'p')))
 							Ctrl->S.font.size = 0.0;
 						else
 							n_errors += gmt_getfont (GMT, word, &(Ctrl->S.font));
@@ -945,6 +956,14 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 							Ctrl->S.offset[1] = DEFAULT_OFFSET * GMT->session.u2u[GMT_PT][GMT_INCH];
 					}
 					if (Ctrl->S.font.size <= 0.0) Ctrl->S.no_label = true;
+					if (gmt_get_modifier (opt->arg, 'l', word)) {
+						Ctrl->S.linear = true;
+						Ctrl->S.reference = SEIS_MOMENT_MANT_REFERENCE * pow (10.0, SEIS_MOMENT_EXP_REFERENCE);	/* May change if +s is given */
+					}
+					if (gmt_get_modifier (opt->arg, 'm', word))
+						Ctrl->S.fixed = true;
+					if (gmt_get_modifier (opt->arg, 's', word))
+						Ctrl->S.reference = atof (word);
 				} else {	/* Old syntax: -S<format><scale>[/fontsize[/offset]][+u] */
 					Ctrl->S.offset[1] = DEFAULT_OFFSET * GMT->session.u2u[GMT_PT][GMT_INCH];	/* Set default offset */
 					if ((p = strstr (opt->arg, "+u"))) {	/* Plot label under symbol [over] */
@@ -967,6 +986,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 				break;
 
 			case 'T':
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->T.active);
 				Ctrl->T.active = true;
 				sscanf (opt->arg, "%d", &Ctrl->T.n_plane);
 				if (strlen (opt->arg) > 2 && gmt_getpen (GMT, &opt->arg[2], &Ctrl->T.pen)) {	/* Set transparent attributes */
@@ -975,6 +995,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 				}
 				break;
 			case 'W':	/* Set line attributes */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->W.active);
 				Ctrl->W.active = true;
 				if (opt->arg && gmt_getpen (GMT, opt->arg, &Ctrl->W.pen)) {
 					gmt_pen_syntax (GMT, 'W', NULL, " ", NULL, 0);
@@ -988,7 +1009,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 		}
 	}
 
-	gmt_consider_current_cpt (GMT->parent, &Ctrl->C.active, &(Ctrl->C.file));
+	gmt_consider_current_cpt (API, &Ctrl->C.active, &(Ctrl->C.file));
 
 	/* Check that the options selected are mutually consistent */
 
@@ -999,6 +1020,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 	n_errors += gmt_M_check_condition (GMT, Ctrl->S.active && Ctrl->S.scale < 0.0, "Option -S: must specify scale\n");
 
 	/* Set to default pen where needed */
+	if (Ctrl->W.active && !Ctrl->L.active) Ctrl->L.active = true;
 
 	if (Ctrl->L.pen.width  < 0.0) Ctrl->L.pen  = Ctrl->W.pen;
 	if (Ctrl->T.pen.width  < 0.0) Ctrl->T.pen  = Ctrl->W.pen;
@@ -1017,7 +1039,7 @@ static int parse (struct GMT_CTRL *GMT, struct PSCOUPE_CTRL *Ctrl, struct GMT_OP
 #define Return(code) {Free_Ctrl (GMT, Ctrl); gmt_end_module (GMT, GMT_cpy); bailout (code);}
 
 EXTERN_MSC int GMT_pscoupe (void *V_API, int mode, void *args) {
-	bool detect_range = false;
+	bool detect_range = false, has_text;
 
 	int n_rec = 0, n_plane_old = 0, form = 0, error;
 	int i, transparence_old = 0, not_defined = 0;
@@ -1031,6 +1053,7 @@ EXTERN_MSC int GMT_pscoupe (void *V_API, int mode, void *args) {
 	double scale, P_x, P_y, T_x, T_y, nominal_size, in[GMT_LEN16];
 
 	char event_title[GMT_BUFSIZ] = {""}, Xstring[GMT_BUFSIZ] = {""}, Ystring[GMT_BUFSIZ] = {""};
+	char *no_name = "<unnamed>", *event_name = NULL;
 
 	st_me meca, mecar;
 	struct MOMENT moment;
@@ -1109,12 +1132,18 @@ EXTERN_MSC int GMT_pscoupe (void *V_API, int mode, void *args) {
 		}
 	}
 
+	if (Ctrl->S.linear)
+		GMT_Report (API, GMT_MSG_INFORMATION, "Linear moment scaling selected, normalizing by %e.\n", Ctrl->S.reference);
+	else
+		GMT_Report (API, GMT_MSG_INFORMATION, "Linear magnitude scaling selected, normalizing by %g.\n", Ctrl->S.reference);
+
 	GMT_Set_Columns (API, GMT_IN, Ctrl->S.n_cols, GMT_COL_FIX);	/* Set the required numerical columns */
 
 	if (GMT_Init_IO (API, GMT_IS_DATASET, GMT_IS_POINT, GMT_IN, GMT_ADD_DEFAULT, 0, options) != GMT_NOERROR) {	/* Register data input */
 		Return (API->error);
 	}
 
+	/* Read the entire input data set */
 	if ((D = GMT_Read_Data (API, GMT_IS_DATASET, GMT_IS_FILE, 0, GMT_READ_NORMAL, NULL, NULL, NULL)) == NULL) {
 		Return (API->error);
 	}
@@ -1140,7 +1169,7 @@ EXTERN_MSC int GMT_pscoupe (void *V_API, int mode, void *args) {
 				}
 			}
 		}
-		if (!Ctrl->M.active) size *= 1.6;	/* Since we are not computing sizes we assume a max Magnitude 8 symbol size instead of 5 */
+		if (!Ctrl->S.fixed) size *= 1.6;	/* Since we are not computing sizes we assume a max Magnitude 8 symbol size instead of 5 */
 		size /= 2.0;	/* Since we want radius below */
 		GMT_Report (API, GMT_MSG_INFORMATION, "Observed frame range is 0/%lg/%lg/%lg\n", Ctrl->A.p_length, Ctrl->A.dmin, Ctrl->A.dmax);
 	}
@@ -1247,6 +1276,7 @@ EXTERN_MSC int GMT_pscoupe (void *V_API, int mode, void *args) {
 
 				/* Data record to process */
 
+				has_text = S->text && S->text[row];
 				n_rec++;
 				if (Ctrl->S.read) nominal_size = scale = in[scol];
 				size = scale;
@@ -1256,7 +1286,7 @@ EXTERN_MSC int GMT_pscoupe (void *V_API, int mode, void *args) {
 				}
 				/* Must examine the trailing text for optional columns: newX, newY and title */
 				/* newX and newY are not used in pscoupe, but we promised psmeca and pscoupe can use the same input file */
-				if (S->text && S->text[row]) {
+				if (has_text) {
 					n_scanned = sscanf (S->text[row], "%s %s %[^\n]s\n", Xstring, Ystring, event_title);
 					if (n_scanned >= 2) { /* Got new x,y coordinates and possibly event title */
 						unsigned int type;
@@ -1370,7 +1400,8 @@ EXTERN_MSC int GMT_pscoupe (void *V_API, int mode, void *args) {
 						Ctrl->T.active = true;
 						Ctrl->T.n_plane = 1;
 						meca.NP1.rake = 1000.0;
-						GMT_Report (API, GMT_MSG_WARNING, "Second plane is not defined for event %s only first plane is plotted.\n", S->text ? S->text[row] : "<unnamed>");
+						event_name = (has_text) ? S->text[row] : no_name;
+						GMT_Report (API, GMT_MSG_WARNING, "Second plane is not defined for event %s only first plane is plotted.\n", event_name);
 					}
 					else
 						meca.NP1.rake = meca_computed_rake2 (meca.NP2.str, meca.NP2.dip, meca.NP1.str, meca.NP1.dip, fault);
@@ -1441,12 +1472,13 @@ EXTERN_MSC int GMT_pscoupe (void *V_API, int mode, void *args) {
 				}
 
 				if (!Ctrl->S.symbol) {
-					if (Ctrl->M.active) {
-						moment.mant = 4.0;
-						moment.exponent = 23;
+					if (Ctrl->S.fixed) {
+						moment.mant     = SEIS_MOMENT_MANT_REFERENCE;
+						moment.exponent = SEIS_MOMENT_EXP_REFERENCE;
 					}
 
-					size = (meca_computed_mw (moment, meca.magms) / 5.0) * scale;
+					size = (scale / Ctrl->S.reference) * ((Ctrl->S.linear) ? moment.mant * pow (10.0, moment.exponent) : meca_computed_mw (moment, meca.magms));
+
 					if (Ctrl->H.active) {	/* Variable scaling of symbol size and pen width */
 						double scl = (Ctrl->H.mode == PSCOUPE_READ_SCALE) ? in[xcol] : Ctrl->H.value;
 						size *= scl;

@@ -17,7 +17,7 @@ Synopsis
 [ |-C|\ [**+l**\ *min*][**+u**\ *max*][**+i**]]
 [ |-D|\ [*template*\ [**+o**\ *orig*]] ]
 [ |-E|\ [**f**\|\ **l**\|\ **m**\|\ **M**\ *stride*] ]
-[ |-F|\ [**c**\|\ **n**\|\ **r**\|\ **v**][**a**\|\ **f**\|\ **s**\|\ **r**\|\ *refpoint*] ]
+[ |-F|\ [**c**\|\ **n**\|\ **p**\|\ **v**][**a**\|\ **f**\|\ **s**\|\ **r**\|\ *refpoint*] ]
 [ |-I|\ [**tsr**] ]
 [ |-L| ]
 [ |-N|\ *col*\ [**+a**\|\ **d**] ]
@@ -90,7 +90,7 @@ Optional Arguments
 
 **-D**\ [*template*\ [**+o**\ *orig*]]
     For multiple segment data, dump each segment to a separate output
-    file [Default writes a multiple segment file to stdout]. Append a
+    file [Default writes a multiple segment file to standard output]. Append a
     format template for the individual file names; this template
     **must** contain a C format specifier that can format an integer
     argument (the running segment number across all tables); this is

@@ -26,6 +26,7 @@
  * on them like add, multiply, etc.
  * Some operators only work on one operand (e.g., log, exp)
  *
+ * Note on KEYS: AD(= means -A takes an input Dataset as argument which may be followed by optional modifiers.
  */
 
 #include "gmt_dev.h"
@@ -792,6 +793,7 @@ static int parse (struct GMT_CTRL *GMT, struct GMTMATH_CTRL *Ctrl, struct GMT_OP
 			/* Processes program-specific parameters */
 
 			case 'A':	/* y(x) table for LSQFIT/SVDFIT operations */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->A.active);
 				Ctrl->A.active = true;	k = 0;
 				if (opt->arg[0] == '-') {	/* Old-style leading hyphen to the filename has been replaced by modifier +r */
 					if (gmt_M_compat_check (GMT, 5)) {
@@ -824,8 +826,10 @@ static int parse (struct GMT_CTRL *GMT, struct GMTMATH_CTRL *Ctrl, struct GMT_OP
 					Ctrl->A.file = strdup (&opt->arg[k]);
 				break;
 			case 'C':	/* Processed in the main loop but not here; just skip */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->C.active);
 				break;
 			case 'E':	/* Set minimum eigenvalue cutoff */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->E.active);
 				Ctrl->E.eigen = atof (opt->arg);
 				break;
 			case 'F':	/* Now obsolete, using -o instead */
@@ -837,16 +841,20 @@ static int parse (struct GMT_CTRL *GMT, struct GMTMATH_CTRL *Ctrl, struct GMT_OP
 					n_errors += gmt_default_error (GMT, opt->option);
 				break;
 			case 'I':	/* Reverse output order */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->I.active);
 				Ctrl->I.active = true;
 				break;
 			case 'L':	/* Apply operator per segment basis */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->L.active);
 				Ctrl->L.active = true;
 				break;
 			case 'N':	/* Sets no of columns and optionally the time column [0] */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->N.active);
 				Ctrl->N.active = true;
 				if (sscanf (opt->arg, "%" PRIu64 "/%" PRIu64, &Ctrl->N.ncol, &Ctrl->N.tcol) == 1) Ctrl->N.tcol = 0;
 				break;
 			case 'Q':	/* Quick for -Ca -N1/0 -T0/0/1 */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->Q.active);
 				Ctrl->Q.active = true;
 				if (opt->arg[0] == 'n')	/* Want no unit conversion on output */
 					Ctrl->Q.unit = GMT_INCH;	/* We do this which will convert from inch to inch, i.e., no change */
@@ -855,6 +863,7 @@ static int parse (struct GMT_CTRL *GMT, struct GMTMATH_CTRL *Ctrl, struct GMT_OP
 					/* else: Default GMT unit on output */
 				break;
 			case 'S':	/* Only want one row (first or last) */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->S.active);
 				Ctrl->S.active = true;
 				switch (opt->arg[0]) {
 					case 'f': case 'F': case '\0':
@@ -868,6 +877,7 @@ static int parse (struct GMT_CTRL *GMT, struct GMTMATH_CTRL *Ctrl, struct GMT_OP
 				}
 				break;
 			case 'T':	/* Either get a file with time coordinate or a min/max/dt setting */
+				n_errors += gmt_M_repeated_module_option (API, Ctrl->T.active);
 				Ctrl->T.active = true;
 				t_arg = opt->arg;
 				break;
@@ -3116,7 +3126,7 @@ GMT_LOCAL int gmtmath_LMSSCLW (struct GMT_CTRL *GMT, struct GMTMATH_INFO *info, 
 			wmode = gmt_mode_weighted (GMT, pair, k);
 			/* 3. Compute the absolute deviations from this mode */
 			for (row = 0; row < k; row++) pair[row].value = (gmt_grdfloat)fabs (pair[row].value - wmode);
-			/* 4. Find the weighted median absolue deviation and scale it */
+			/* 4. Find the weighted median absolute deviation and scale it */
 			lmsscl = MAD_NORMALIZE * gmt_median_weighted (GMT, pair, k);
 			for (row = 0; row < info->T->segment[s]->n_rows; row++) T_prev->segment[s]->data[col][row] = lmsscl;
 		}
@@ -3129,7 +3139,7 @@ GMT_LOCAL int gmtmath_LMSSCLW (struct GMT_CTRL *GMT, struct GMTMATH_INFO *info, 
 	wmode = gmt_mode_weighted (GMT, pair, k);
 	/* 3. Compute the absolute deviations from this mode */
 	for (row = 0; row < k; row++) pair[row].value = (gmt_grdfloat)fabs (pair[row].value - wmode);
-	/* 4. Find the weighted median absolue deviation and scale it */
+	/* 4. Find the weighted median absolute deviation and scale it */
 	lmsscl = MAD_NORMALIZE * gmt_median_weighted (GMT, pair, k);
 	gmt_M_free (GMT, pair);
 
@@ -3364,7 +3374,7 @@ GMT_LOCAL int gmtmath_MADW (struct GMT_CTRL *GMT, struct GMTMATH_INFO *info, str
 			wmed = gmt_median_weighted (GMT, pair, k);
 			/* 3. Compute the absolute deviations from this median */
 			for (row = 0; row < k; row++) pair[row].value = (gmt_grdfloat)fabs (pair[row].value - wmed);
-			/* 4. Find the weighted median absolue deviation */
+			/* 4. Find the weighted median absolute deviation */
 			wmad = gmt_median_weighted (GMT, pair, k);
 			for (row = 0; row < info->T->segment[s]->n_rows; row++) T_prev->segment[s]->data[col][row] = wmad;
 		}
@@ -6375,12 +6385,12 @@ EXTERN_MSC int GMT_gmtmath (void *V_API, int mode, void *args) {
 			GMT_Report (API, GMT_MSG_ERROR, "Cannot have data files when -A is specified\n");
 			Return (GMT_RUNTIME_ERROR);
 		}
-		gmt_disable_bghi_opts (GMT);	/* Do not want any -b -g -h -i to affect the reading from -A files */
+		gmt_disable_bghio_opts (GMT);	/* Do not want any -b -g -h -i -o to affect the reading from -A files */
 		if ((A_in = GMT_Read_Data (API, GMT_IS_DATASET, GMT_IS_FILE, GMT_IS_NONE, GMT_READ_NORMAL, NULL, Ctrl->A.file, NULL)) == NULL) {
 			GMT_Report (API, GMT_MSG_ERROR, "Failure while reading file %s\n", Ctrl->A.file);
 			Return (API->error);
 		}
-		gmt_reenable_bghi_opts (GMT);	/* Recover settings provided by user (if -b -g -h -i were used at all) */
+		gmt_reenable_bghio_opts (GMT);	/* Recover settings provided by user (if -b -g -h -i were used at all) */
 		rhs = A_in->table[0];	/* Only one table */
 		if (Ctrl->A.w_mode) {	/* Need at least 3 columns */
 			if (rhs->n_columns < 3) {
@@ -6469,7 +6479,8 @@ EXTERN_MSC int GMT_gmtmath (void *V_API, int mode, void *args) {
 		}
 	}
 	else {	/* Create orderly output */
-		dim[GMT_COL] = 3;	dim[GMT_ROW] = n_rows;
+		dim[GMT_COL] = 3;	/* To store the 3 different flavors of T */
+		dim[GMT_ROW] = n_rows;
 		if ((Time = GMT_Create_Data (API, GMT_IS_DATASET, GMT_IS_NONE, 0, dim, NULL, NULL, 0, 0, NULL)) == NULL) Return (GMT_MEMORY_ERROR);
 		info.T = Time->table[0];
         	info.T->segment[0]->n_rows = n_rows;
@@ -6745,7 +6756,7 @@ EXTERN_MSC int GMT_gmtmath (void *V_API, int mode, void *args) {
 		for (j = 0, i = nstack - eaten; j < created; j++, i++) {
 			if (stack[i]->constant && !stack[i]->D) {
 				stack[i]->D = gmt_alloc_dataset (GMT, Template, 0, n_columns, GMT_ALLOC_NORMAL);
-				if (!Ctrl->T.notime) gmtmath_load_column (stack[i]->D, COL_T, info.T, COL_T);	/* Make sure t-column is copied if needed */
+				if (!Ctrl->T.notime) gmtmath_load_column (stack[i]->D, Ctrl->N.tcol, info.T, COL_T);	/* Make sure t-column is copied if needed */
 			}
 		}
 
@@ -6791,7 +6802,7 @@ EXTERN_MSC int GMT_gmtmath (void *V_API, int mode, void *args) {
 		if (!stack[last]->D)
 			stack[last]->D = gmt_alloc_dataset (GMT, Template, 0, n_columns, GMT_ALLOC_NORMAL);
 		for (j = 0; j < n_columns; j++) {
-			if (j == COL_T && !Ctrl->Q.active && Ctrl->C.cols[j])
+			if (j == Ctrl->N.tcol && !Ctrl->Q.active && Ctrl->C.cols[j])
 				gmtmath_load_column (stack[last]->D, j, info.T, COL_T);
 			else if (!Ctrl->C.cols[j])
 				gmtmath_load_const_column (stack[last]->D, j, stack[last]->factor);

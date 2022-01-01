@@ -111,7 +111,8 @@ enum PSL_enum_vecattr {
 	PSL_VEC_MID_FWD		= 262144,	/* End point of vector should be moved a distance along the line */
 	PSL_VEC_MID_BWD		= 524288,	/* End point of vector should be moved a distance along the line */
 	PSL_VEC_COMPONENTS	= 1048576,	/* Not yet needed in postscriptlight: Got vector dx, dy Cartesian components */
-	PSL_VEC_SCALE		= 2097152};	/* Not yet needed in postscriptlight: If not set we determine the required inch-to-degree scale */
+	PSL_VEC_SCALE		= 2097152,	/* Not yet needed in postscriptlight: If not set we determine the required inch-to-degree scale */
+	PSL_VEC_LINE		= 4194304};	/* Flag that we are adding vector heads to a line, not a stand-alone vector */
 
 enum PSL_enum_vecdim {	/* Indices into the dim[] array passed to psl_vector */
 	PSL_VEC_XTIP 			= 0,	/* x-coordinate of tip of vector in inches */
@@ -159,6 +160,7 @@ enum PSL_enum_matharcdim {	/* Indices into the dim[] array passed to psl_matharc
 #define PSL_vec_side(status,head) (((status>>(2+2*head))&3) ? 2*((status>>(2+2*head))&3)-3 : 0)	/* Return side selection for this head as 0,-1,+1 */
 #define PSL_vec_outline(status) ((status&PSL_VEC_OUTLINE) || (status&PSL_VEC_OUTLINE2))	/* Return true if outline is currently selected */
 #define PSL_vec_fill(status) ((status&PSL_VEC_FILL) || (status&PSL_VEC_FILL2))		/* Return true if fill is currently selected */
+#define PSL_vec_headcheck(status) (((status)&PSL_VEC_LINE) == 0)	/* Flag when vector head is actually the end point of a line so we should not consider length a factor to exclude heads */
 
 /* PSL codes for arguments of PSL_beginplot and other routines */
 
@@ -447,6 +449,7 @@ EXTERN_MSC int PSL_plotaxis (struct PSL_CTRL *PSL, double annotation_int, char *
 EXTERN_MSC int PSL_plotbitimage (struct PSL_CTRL *PSL, double x, double y, double xsize, double ysize, int justify, unsigned char *buffer, int nx, int ny, double f_rgb[], double b_rgb[]);
 EXTERN_MSC int PSL_plotcolorimage (struct PSL_CTRL *PSL, double x, double y, double xsize, double ysize, int justify, unsigned char *buffer, int nx, int ny, int nbits);
 EXTERN_MSC int PSL_plotepsimage (struct PSL_CTRL *PSL, double x, double y, double xsize, double ysize, int justify, unsigned char *buffer, struct imageinfo *h);
+EXTERN_MSC int PSL_plotlatexeps (struct PSL_CTRL *PSL, double x, double y, double xsize, double ysize, int justify, unsigned char *buffer, double *rgb, struct imageinfo *h);
 EXTERN_MSC int PSL_plotline (struct PSL_CTRL *PSL, double *x, double *y, int n, int type);
 EXTERN_MSC int PSL_plotcurve (struct PSL_CTRL *PSL, double *x, double *y, int n, int type);
 EXTERN_MSC int PSL_plotparagraph (struct PSL_CTRL *PSL, double x, double y, double fontsize, char *paragraph, double angle, int justify);

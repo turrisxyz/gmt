@@ -30,7 +30,7 @@ Common Options
      - :ref:`Select binary output <-bo_full>`
    * - **-c**\ [*row*\ ,\ *col*\|\ *index*]
      - :ref:`Advance plot focus to selected (or next) subplot panel <-c_full>`
-   * - **-d**\ [**i**\|\ **o**]\ *nodata*
+   * - **-d**\ [**i**\|\ **o**]\ *nodata*\ [**+c**\ *col*]
      - :ref:`Replace columns with nodata with NaN <-d_full>`
    * - **-e**\ [**~**]\ *"pattern"* \| **-e**\ [**~**]/\ *regexp*/[**i**]
      - :ref:`Filter data records that match the given pattern <-e_full>`
@@ -40,7 +40,7 @@ Common Options
      - :ref:`Segment data by detecting gaps <-g_full>`
    * - **-h**\ [**i**\|\ **o**][*n*][**+c**][**+d**][**+m**\ *segheader*][**+r**\ *remark*][**+t**\ *title*]
      - :ref:`ASCII tables have header record[s] <-h_full>`
-   * - **-i**\ *cols*\ [**+l**][**+d**\ *divide*][**+s**\ *scale*][**+o**\ *offset*][,\ *...*][,\ **t**\ [*word*]]
+   * - **-i**\ *cols*\ [**+l**][**+d**\ *divide*][**+s**\ *scale*\|\ **d**\|\ **k**][**+o**\ *offset*][,\ *...*][,\ **t**\ [*word*]]
      - :ref:`Selection of input columns <-icols_full>`
    * - **-je**\|\ **f**\|\ **g**
      - :ref:`Mode of spherical distance calculation <-distcalc_full>`

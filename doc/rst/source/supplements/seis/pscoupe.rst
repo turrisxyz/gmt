@@ -17,7 +17,7 @@ Synopsis
 |-J|\ *parameters*
 |SYN_OPT-R|
 |-A|\ **a**\|\ **b**\|\ **c**\|\ **d**\ *params*\ [**+c**\ [**n**\|\ **t**]][**+d**\ *dip*][**+r**\ [**a**\|\ **e**\|\ *dx*]][**+w**\ *width*][**+z**\ [**s**]\ **a**\|\ **e**\|\ *dz*\|\ *min*/*max*]
-|-S|\ *format*\ [*scale*]\ [**+a**\ *angle*][**+f**\ *font*][**+j**\ *justify*][**+o**\ *dx*\ [/*dy*]]
+|-S|\ *format*\ [*scale*][**+a**\ *angle*][**+f**\ *font*][**+j**\ *justify*][**+l**][**+m**][**+o**\ *dx*\ [/*dy*]][**+s**\ *reference*]
 [ |SYN_OPT-B| ]
 [ |-C|\ *cpt* ]
 [ |-E|\ *fill* ]
@@ -27,7 +27,6 @@ Synopsis
 [ |-I|\ [*intens*] ]
 [ |-K| ]
 [ |-L|\ *[pen]* ]
-[ |-M| ]
 [ |-N| ]
 [ |-O| ]
 [ |-Q| ]
@@ -47,7 +46,9 @@ Synopsis
 [ |SYN_OPT-:| ]
 [ |SYN_OPT--| ]
 
-.. include:: coupe_common.rst_
+.. include:: coupe.rst
+    :start-after: .. module_common_begins
+    :end-before: .. module_common_ends
 
 .. include:: ../../common_classic.rst_
 

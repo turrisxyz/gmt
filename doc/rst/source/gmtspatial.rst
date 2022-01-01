@@ -12,7 +12,8 @@ Synopsis
 
 .. include:: common_SYN_OPTs.rst_
 
-**gmt spatial** [ *table* ] [ |-A|\ [**a**\ *min_dist*][*unit*]]
+**gmt spatial** [ *table* ]
+[ |-A|\ [**a**\ *min_dist*][*unit*]]
 [ |-C| ]
 [ |-D|\ [**+a**\ *amax*][**+c\|C**\ *cmax*][**+d**\ *dmax*][**+f**\ *file*][**+p**][**+s**\ *fact*] ]
 [ |-E|\ **+p**\|\ **n** ]
@@ -25,6 +26,7 @@ Synopsis
 [ |-S|\ **b**\ *width*\|\ **h**\|\ **i**\|\ **u**\|\ **s**\|\ **j** ]
 [ |-T|\ [*clippolygon*] ]
 [ |SYN_OPT-V| ]
+[ |SYN_OPT-a| ]
 [ |SYN_OPT-b| ]
 [ |SYN_OPT-d| ]
 [ |SYN_OPT-e| ]
@@ -35,6 +37,7 @@ Synopsis
 [ |SYN_OPT-j| ]
 [ |SYN_OPT-o| ]
 [ |SYN_OPT-q| ]
+[ |SYN_OPT-s| ]
 [ |SYN_OPT-:| ]
 [ |SYN_OPT--| ]
 
@@ -111,7 +114,7 @@ Optional Arguments
 
 **-E**\ **+p**\|\ **n**
     Reset the handedness of all polygons to match the given **+p**
-    (counter-clockwise; positive) or **+n** (clockwise; negative). Implies **-Q+**.
+    (counter-clockwise; positive) or **+n** (clockwise; negative).
 
 .. _-F:
 
@@ -125,7 +128,10 @@ Optional Arguments
     Determine the intersection locations between all pairs of polygons.
     Append **i** to only compute internal (i.e., self-intersecting
     polygons) crossovers or **e** to only compute external (i.e.,
-    between pairs of polygons) crossovers [Default is both].
+    between pairs of polygons) crossovers [Default is both].  Output
+    records will list the coordinates of the crossing, the relative times
+    along the two segments (i.e., floating point record numbers at the
+    crossing), and the names of the two segments (as trailing text).
 
 .. _-L:
 
@@ -144,7 +150,7 @@ Optional Arguments
     (first **-Z**, then **-L** are scanned), or it is assigned the
     running number that is initialized to *start* [0]. By default the
     input segment that are found to be inside a polygon are written to
-    stdout with the polygon ID encoded in the segment header as
+    standard output with the polygon ID encoded in the segment header as
     **-Z**\ *ID*. Alternatively, append **+r** to just report which
     polygon contains a feature or **+z** to have the IDs added as an
     extra data column on output. Segments that fail to be inside a
@@ -156,11 +162,11 @@ Optional Arguments
 **-Q**\ [*unit*][**+c**\ *min*\ [/*max*]][**+h**][**+l**][**+p**][**+s**\ [**a**\|\ **d**]]
     Measure the area of all polygons or length of line segments. Use
     **-Q+h** to append the area to each polygons segment header [Default
-    simply writes the area to stdout]. For polygons we also compute the
+    simply writes the area to standard output]. For polygons we also compute the
     centroid location while for line data we compute the mid-point
-    (half-length) position. Append a distance unit to select the unit
-    used (see `Units`_). Note that the area will depend on the current
-    setting of :term:`PROJ_ELLIPSOID`; this should be a
+    (half-length) position. For geographical data, optionally append a
+    distance unit to select the unit used (see `Units`_) [k]. Note that
+    the area will depend on the current setting of :term:`PROJ_ELLIPSOID`; this should be a
     recent ellipsoid to get accurate results. The centroid is computed
     using the mean of the 3-D Cartesian vectors making up the polygon
     vertices, while the area is obtained via an equal-area projection.
@@ -209,6 +215,8 @@ Optional Arguments
     :start-after: **Syntax**
     :end-before: **Description**
 
+.. include:: explain_-aspatial.rst_
+
 .. |Add_-bi| replace:: [Default is 2 input columns].
 .. include:: explain_-bi.rst_
 
@@ -237,6 +245,8 @@ Optional Arguments
 .. include:: explain_-ocols.rst_
 
 .. include:: explain_-q.rst_
+
+.. include:: explain_-s.rst_
 
 .. include:: explain_colon.rst_
 
