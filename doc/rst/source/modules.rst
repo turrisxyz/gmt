@@ -2,7 +2,6 @@ Modules
 =======
 
 .. note::
-
    Looking for the *classic mode* modules like ``psxy`` and ``pscoast``? See the
    :doc:`equivalent page for classic mode <modules-classic>`.
 
@@ -49,7 +48,6 @@ All modules are requested via a call to the :doc:`gmt` program.
    gmtconnect
    gmtconvert
    gmtdefaults
-   grdgdal
    gmtget
    gmtinfo
    gmtlogo
@@ -59,6 +57,7 @@ All modules are requested via a call to the :doc:`gmt` program.
    gmtset
    gmtsimplify
    gmtspatial
+   gmtsplit
    gmtvector
    gmtwhich
    grd2cpt
@@ -73,6 +72,7 @@ All modules are requested via a call to the :doc:`gmt` program.
    grdfft
    grdfill
    grdfilter
+   grdgdal
    grdgradient
    grdhisteq
    grdimage
@@ -85,6 +85,7 @@ All modules are requested via a call to the :doc:`gmt` program.
    grdpaste
    grdproject
    grdsample
+   grdselect
    grdtrack
    grdtrend
    grdvector
@@ -113,7 +114,6 @@ All modules are requested via a call to the :doc:`gmt` program.
    sphdistance
    sphinterpolate
    sphtriangulate
-   splitxyz
    subplot
    surface
    ternary
@@ -213,7 +213,6 @@ Core Modules
     - :doc:`gmtconnect`
     - :doc:`gmtconvert`
     - :doc:`gmtdefaults`
-    - :doc:`grdgdal`
     - :doc:`gmtget`
     - :doc:`gmtinfo`
     - :doc:`gmtlogo`
@@ -223,6 +222,7 @@ Core Modules
     - :doc:`gmtset`
     - :doc:`gmtsimplify`
     - :doc:`gmtspatial`
+    - :doc:`gmtsplit`
     - :doc:`gmtvector`
     - :doc:`gmtwhich`
     - :doc:`grd2cpt`
@@ -237,6 +237,7 @@ Core Modules
     - :doc:`grdfft`
     - :doc:`grdfill`
     - :doc:`grdfilter`
+    - :doc:`grdgdal`
     - :doc:`grdgradient`
     - :doc:`grdhisteq`
     - :doc:`grdimage`
@@ -249,6 +250,7 @@ Core Modules
     - :doc:`grdpaste`
     - :doc:`grdproject`
     - :doc:`grdsample`
+    - :doc:`grdselect`
     - :doc:`grdtrack`
     - :doc:`grdtrend`
     - :doc:`grdvector`
@@ -277,7 +279,6 @@ Core Modules
     - :doc:`sphdistance`
     - :doc:`sphinterpolate`
     - :doc:`sphtriangulate`
-    - :doc:`splitxyz`
     - :doc:`subplot`
     - :doc:`surface`
     - :doc:`ternary`
@@ -502,6 +503,8 @@ Information retrieval
 +-----------------------+-----------------------+
 | :doc:`grdinfo`        | |grdinfo_purpose|     |
 +-----------------------+-----------------------+
+| :doc:`grdselect`      | |grdselect_purpose|   |
++-----------------------+-----------------------+
 
 Mathematical operations on tables or grids
 ------------------------------------------
@@ -534,6 +537,8 @@ Convert or extract subsets of data
 +-----------------------+-----------------------+
 | :doc:`gmtspatial`     | |gmtspatial_purpose|  |
 +-----------------------+-----------------------+
+| :doc:`gmtsplit`       | |gmtsplit_purpose|    |
++-----------------------+-----------------------+
 | :doc:`gmtvector`      | |gmtvector_purpose|   |
 +-----------------------+-----------------------+
 | :doc:`grd2kml`        | |grd2kml_purpose|     |
@@ -547,8 +552,6 @@ Convert or extract subsets of data
 | :doc:`grdcut`         | |grdcut_purpose|      |
 +-----------------------+-----------------------+
 | :doc:`grdpaste`       | |grdpaste_purpose|    |
-+-----------------------+-----------------------+
-| :doc:`splitxyz`       | |splitxyz_purpose|    |
 +-----------------------+-----------------------+
 | :doc:`xyz2grd`        | |xyz2grd_purpose|     |
 +-----------------------+-----------------------+
