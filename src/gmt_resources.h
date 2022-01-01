@@ -60,7 +60,8 @@ enum GMT_enum_session {
 	GMT_SESSION_COLMAJOR  = 4,	/* External API uses column-major formats (e.g., MATLAB, FORTRAN). [Row-major format] */
 	GMT_SESSION_LOGERRORS = 8,	/* External API uses column-major formats (e.g., MATLAB, FORTRAN). [Row-major format] */
 	GMT_SESSION_RUNMODE   = 16,	/* If set enable GMT's modern runmode. [Classic] */
-	GMT_SESSION_NOHISTORY = 32	/* Do not use gmt.history at all [Let modules decide] */
+	GMT_SESSION_NOHISTORY = 32,	/* Do not use gmt.history at all [Let modules decide] */
+	GMT_SESSION_NOGDALCLOSE = 64	/* Do not call GDALDestroyDriverManager when using GDAL functions */
 };
 
 /*! Logging settings */
@@ -90,8 +91,8 @@ enum GMT_enum_type {
 	GMT_ULONG	=    7,  /* uint64_t, 8-byte unsigned integer type */
 	GMT_FLOAT	=    8,  /* 4-byte data float type */
 	GMT_DOUBLE	=    9,  /* 8-byte data float type */
-	GMT_TEXT	=   10,  /* Arbitrarily long text string [OGR/GMT use only] */
-	GMT_DATETIME	=   11,  /* string with date/time info [OGR/GMT use only] */
+	GMT_TEXT	=   16,  /* Arbitrarily long text string [OGR/GMT use only and GMT_Put_Vector only] */
+	GMT_DATETIME	=   32,  /* string with date/time info [OGR/GMT use and GMT_Put_Vector only] */
 	GMT_N_TYPES	=   12,  /* The number of supported data types above */
 	GMT_VIA_CHAR	=  100,  /* int8_t, 1-byte signed integer type */
 	GMT_VIA_UCHAR	=  200,  /* uint8_t, 1-byte unsigned integer type */
@@ -272,12 +273,17 @@ enum GMT_enum_header {
 	GMT_HEADER_ON = 1	/* Enable header blocks out as default */
 };
 
+enum GMT_enum_data {
+	GMT_DATA_IS_GEO = 256	/*  Data are geographic, not Cartesian */
+};
+
 enum GMT_enum_alloc {
 	GMT_ALLOC_EXTERNALLY = 0,	/* Allocated outside of GMT: We cannot reallocate or free this memory */
 	GMT_ALLOC_INTERNALLY = 1,	/* Allocated by GMT: We may reallocate as needed and free when no longer needed */
 	GMT_ALLOC_NORMAL = 0,		/* Normal allocation of new dataset based on shape of input dataset */
 	GMT_ALLOC_VERTICAL = 4,		/* Allocate a single table for data set to hold all input tables by vertical concatenation */
-	GMT_ALLOC_HORIZONTAL = 8	/* Allocate a single table for data set to hold all input tables by horizontal (paste) concatenations */
+	GMT_ALLOC_HORIZONTAL = 8,	/* Allocate a single table for data set to hold all input tables by horizontal (paste) concatenations */
+	GMT_ALLOC_VIA_ICOLS = 16	/* Follow -i settings when doing the duplication */
 };
 
 enum GMT_enum_duplicate {
@@ -362,10 +368,12 @@ enum GMT_enum_gridio {
 	GMT_GRID_ROW_BY_ROW	   = 32U,   /* Read|write the grid array one row at the time sequentially */
 	GMT_GRID_ROW_BY_ROW_MANUAL = 64U,   /* Read|write the grid array one row at the time in any order */
 	GMT_GRID_XY		   = 128U,  /* Allocate and initialize x,y vectors */
-	GMT_GRID_IS_GEO		   = 256U,  /* Grid is a geographic grid, not Cartesian */
+	GMT_GRID_IS_GEO		   = 256U,  /* Grid is a geographic grid, not Cartesian [Deprecated, use GMT_DATA_IS_GEO instead] */
 	GMT_GRID_IS_IMAGE	   = 512U,   /* Grid may be an image, only allowed with GMT_CONTAINER_ONLY */
 	GMT_IMAGE_NO_INDEX	   = 4096,	/* If reading an indexed grid, convert to rgb so we can interpolate */
-	GMT_IMAGE_ALPHA_LAYER  = 8192	/* Place any alpha layer in the image band, not alpha array */
+	GMT_IMAGE_ALPHA_LAYER  = 8192,	/* Place any alpha layer in the image band, not alpha array */
+	GMT_GRID_NEEDS_PAD1	   = 65536,	/* This module requires grids or images to have at least 1 boundary pad all around */
+	GMT_GRID_NEEDS_PAD2	   = 131072	/* This module requires grids or images to have at least 2 boundary pad all around */
 };
 
 #define GMT_GRID_ALL		0U   /* Backwards compatibility for < 5.3.3; See GMT_CONTAINER_AND_DATA */

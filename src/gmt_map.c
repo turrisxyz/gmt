@@ -1081,6 +1081,7 @@ GMT_LOCAL int gmtmap_jump_x (struct GMT_CTRL *GMT, double x0, double y0, double 
 
 GMT_LOCAL int gmtmap_jump_xy (struct GMT_CTRL *GMT, double x0, double y0, double x1, double y1) {
 	/* true if x- or y-distance between points exceeds 1/2 map width at this y value or map height */
+	bool periodic;
 	double dx, dy, map_half_width, map_half_height;
 
 	if (!(gmt_M_is_cylindrical (GMT) || gmt_M_is_perspective (GMT) || gmt_M_is_misc (GMT))) return (0);	/* Only projections with periodic boundaries may apply */
@@ -1090,7 +1091,7 @@ GMT_LOCAL int gmtmap_jump_xy (struct GMT_CTRL *GMT, double x0, double y0, double
 	map_half_width = MAX (gmt_half_map_width (GMT, y0), gmt_half_map_width (GMT, y1));
 	if (fabs (map_half_width) < GMT_CONV4_LIMIT) return (0);	/* Very close to a pole for some projections */
 	map_half_height = 0.5 * GMT->current.map.height;	/* We assume this is constant */
-
+	periodic = gmt_M_360_range (GMT->common.R.wesn[XLO], GMT->common.R.wesn[XHI]);
 	dx = x1 - x0;
 	if (fabs (dx) > map_half_width) {	/* Possible jump; let's see how far apart those longitudes really are */
 		/* This test on longitudes was added to deal with issue #672, also see test/psxy/nojump.sh */
@@ -1098,7 +1099,10 @@ GMT_LOCAL int gmtmap_jump_xy (struct GMT_CTRL *GMT, double x0, double y0, double
 		double half_lon_range = (GMT->common.R.oblique) ? 180.0 : 0.5 * (GMT->common.R.wesn[XHI] - GMT->common.R.wesn[XLO]);
 		gmt_xy_to_geo (GMT, &last_lon, &dummy, x0, y0);
 		gmt_xy_to_geo (GMT, &this_lon, &dummy, x1, y1);
-		gmt_M_set_delta_lon (last_lon, this_lon, dlon);	/* Beware of jumps due to sign differences */
+		if (periodic)
+			dlon = last_lon - this_lon;
+		else
+			gmt_M_set_delta_lon (last_lon, this_lon, dlon);	/* Beware of jumps due to sign differences */
 		if (fabs (dlon) < half_lon_range) /* Not going the long way so we judge this to be no jump */
 			return (0);
 		/* Jump it is */
@@ -2209,6 +2213,7 @@ GMT_LOCAL void gmtmap_setxy (struct GMT_CTRL *GMT, double xmin, double xmax, dou
 		update_parameters = true;
 		GMT_Report (GMT->parent, GMT_MSG_DEBUG, "Rescaling map for subplot by factors fx = %g fy = %g dx = %g dy = %g\n", fx, fy, P->dx, P->dy);
 		if (gmt_M_is_rect_graticule (GMT) && P->parallel) {
+			GMT_Report (GMT->parent, GMT_MSG_DEBUG, "Force parallel latitude annotations\n");
 			strcpy (GMT->current.setting.map_annot_ortho, "");	/* All annotations will be parallel to axes */
 			GMT->current.setting.map_annot_oblique |= GMT_OBL_ANNOT_LAT_PARALLEL;	/* Plot latitude parallel to frame for geo maps */
 		}
@@ -2793,6 +2798,10 @@ GMT_LOCAL int gmtmap_init_polar (struct GMT_CTRL *GMT, bool *search) {
 
 	*search = false;
 	gmtproj_vpolar (GMT, GMT->current.proj.pars[1]);
+	if (GMT->current.proj.angle_kind == GMT_IS_LAT && (GMT->common.R.wesn[XLO] < -90.0 || GMT->common.R.wesn[XHI] > 90.0)) {
+		GMT_Report (GMT->parent, GMT_MSG_ERROR, "Option -R:  Your +ky modifier for -Jp|P implies angles must be contained in the -90/+90 range (latitudes)\n");
+		return GMT_PROJECTION_ERROR;
+	}
 	if (GMT->current.proj.flip) {	/* Check restrictions */
 		if (GMT->common.R.wesn[YLO] < 0.0 || GMT->common.R.wesn[YHI] > GMT->current.proj.flip_radius) {
 			GMT_Report (GMT->parent, GMT_MSG_ERROR, "-JP...+f requires s >= 0 and n <= %g!\n", GMT->current.proj.flip_radius);
@@ -2841,7 +2850,7 @@ GMT_LOCAL int gmtmap_init_merc (struct GMT_CTRL *GMT, bool *search) {
 		gmtlib_scale_eqrad (GMT);
 		D = GMT->current.setting.ref_ellipsoid[GMT->current.setting.proj_ellipsoid].eq_radius / GMT->current.proj.lat_swap_vals.rm;
 	}
-	if (GMT->common.R.wesn[YLO] <= -90.0 || GMT->common.R.wesn[YHI] >= 90.0) {
+	if (doubleAlmostEqual (GMT->common.R.wesn[YLO], -90.0) || doubleAlmostEqual (GMT->common.R.wesn[YHI], 90.0)) {
 		GMT_Report (GMT->parent, GMT_MSG_ERROR, "Option -R:  Cannot include south/north poles with Mercator projection!\n");
 		return GMT_PROJECTION_ERROR;
 	}
@@ -3047,15 +3056,21 @@ GMT_LOCAL int gmtmap_init_cylstereo (struct GMT_CTRL *GMT, bool *search) {
 
 GMT_LOCAL int gmtmap_init_stereo (struct GMT_CTRL *GMT, bool *search) {
 	unsigned int i;
+	bool std_parallel = (lrint (GMT->current.proj.pars[5]) == 1);
 	double xmin = 0.0, xmax = 0.0, ymin = 0.0, ymax = 0.0, dummy = 0.0, radius = 0.0, latg, D = 1.0;
 
 	GMT->current.proj.GMT_convert_latitudes = !gmt_M_is_spherical (GMT);
 	latg = GMT->current.proj.pars[1];
 
+	if (std_parallel && !doubleAlmostEqual (fabs (latg), 90.0)) {
+		GMT_Report (GMT->parent, GMT_MSG_ERROR, "Cannot set true scale at given parallel when stereographic projection is not polar!\n");
+		return (GMT_RUNTIME_ERROR);
+	}
+
 	gmtmap_set_polar (GMT);
 
 	if (GMT->current.setting.proj_scale_factor == -1.0) GMT->current.setting.proj_scale_factor = 0.9996;	/* Select default map scale for Stereographic */
-	if (GMT->current.proj.polar && (lrint (GMT->current.proj.pars[5]) == 1)) GMT->current.setting.proj_scale_factor = 1.0;	/* Gave true scale at given parallel set below */
+	if (GMT->current.proj.polar && std_parallel) GMT->current.setting.proj_scale_factor = 1.0;	/* Gave true scale at given parallel set below */
 	/* Equatorial view has a problem with infinite loops.  Until I find a cure
 	  we set projection center latitude to 0.001 so equatorial works for now */
 
@@ -3070,9 +3085,8 @@ GMT_LOCAL int gmtmap_init_stereo (struct GMT_CTRL *GMT, bool *search) {
 		if (GMT->current.proj.polar) {
 			e1p = 1.0 + GMT->current.proj.ECC;	e1m = 1.0 - GMT->current.proj.ECC;
 			D /= d_sqrt (pow (e1p, e1p) * pow (e1m, e1m));
-			if (lrint (GMT->current.proj.pars[5]) == 1) {	/* Gave true scale at given parallel */
+			if (std_parallel) {	/* Gave true scale at given parallel */
 				double k_p, m_c, t_c, es;
-
 				sincosd (fabs (GMT->current.proj.pars[4]), &s, &c);
 				es = GMT->current.proj.ECC * s;
 				m_c = c / d_sqrt (1.0 - GMT->current.proj.ECC2 * s * s);
@@ -3133,16 +3147,18 @@ GMT_LOCAL int gmtmap_init_stereo (struct GMT_CTRL *GMT, bool *search) {
 	else {
 		if (GMT->current.proj.polar) {	/* Polar aspect */
 			if (GMT->current.proj.north_pole) {
-				if (GMT->common.R.wesn[YLO] <= -90.0) {
-					GMT_Report (GMT->parent, GMT_MSG_ERROR, "South boundary cannot be -90.0 for north polar stereographic projection\n");
-					return GMT_PROJECTION_ERROR;
+				double hor_lat = 90.0 - GMT->current.proj.f_horizon;
+				if (GMT->common.R.wesn[YLO] < hor_lat) {
+					GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "South boundary cannot be beyond the horizon for north polar stereographic projection (reset to horizon at %lg)\n", hor_lat);
+					GMT->common.R.wesn[YLO] = hor_lat;
 				}
 				if (GMT->common.R.wesn[YHI] >= 90.0) GMT->current.proj.edge[2] = false;
 			}
 			else {
-				if (GMT->common.R.wesn[YHI] >= 90.0) {
-					GMT_Report (GMT->parent, GMT_MSG_ERROR, "North boundary cannot be +90.0 for south polar stereographic projection\n");
-					return GMT_PROJECTION_ERROR;
+				double hor_lat = GMT->current.proj.f_horizon - 90.0;
+				if (GMT->common.R.wesn[YHI] > hor_lat) {
+					GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "North boundary cannot be beyond the horizon for south polar stereographic projection (reset to horizon at %lg)\n", hor_lat);
+					GMT->common.R.wesn[YHI] = hor_lat;
 				}
 				if (GMT->common.R.wesn[YLO] <= -90.0) GMT->current.proj.edge[0] = false;
 			}
@@ -3438,6 +3454,10 @@ GMT_LOCAL int gmtmap_init_oblique (struct GMT_CTRL *GMT, bool *search) {
 		gmtproj_oblmrc (GMT, GMT->common.R.wesn[XHI], GMT->common.R.wesn[YHI], &xmax, &ymax);
 	}
 	else {	/* Gave oblique degrees */
+		if (doubleAlmostEqual (GMT->common.R.wesn[YLO], -90.0) || doubleAlmostEqual (GMT->common.R.wesn[YHI], 90.0)) {
+			GMT_Report (GMT->parent, GMT_MSG_ERROR, "Option -R:  Cannot include south/north oblique poles with Oblique Mercator projection!\n");
+			return GMT_PROJECTION_ERROR;
+		}
 		/* Convert oblique wesn in degrees to meters using regular Mercator */
 		if (gmt_M_360_range (GMT->common.R.wesn[XLO], GMT->common.R.wesn[XHI])) {
 			GMT->common.R.wesn[XLO] = -180.0;
@@ -3877,16 +3897,18 @@ GMT_LOCAL int gmtmap_init_lambeq (struct GMT_CTRL *GMT, bool *search) {
 	else {
 		if (GMT->current.proj.polar) {	/* Polar aspect */
 			if (GMT->current.proj.north_pole) {
-				if (GMT->common.R.wesn[YLO] <= -90.0){
-					GMT_Report (GMT->parent, GMT_MSG_ERROR, "South boundary cannot be -90.0 for north polar Lambert azimuthal projection\n");
-					return GMT_PROJECTION_ERROR;
+				double hor_lat = 90.0 - GMT->current.proj.f_horizon;
+				if (GMT->common.R.wesn[YLO] < hor_lat) {
+					GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "South boundary cannot be beyond the horizon for north polar Lambert azimuthal projection (reset to horizon at %lg)\n", hor_lat);
+					GMT->common.R.wesn[YLO] = hor_lat;
 				}
 				if (GMT->common.R.wesn[YHI] >= 90.0) GMT->current.proj.edge[2] = false;
 			}
 			else {
-				if (GMT->common.R.wesn[YHI] >= 90.0) {
-					GMT_Report (GMT->parent, GMT_MSG_ERROR, "North boundary cannot be +90.0 for south polar Lambert azimuthal projection\n");
-					return GMT_PROJECTION_ERROR;
+				double hor_lat = GMT->current.proj.f_horizon - 90.0;
+				if (GMT->common.R.wesn[YHI] > hor_lat) {
+					GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "North boundary cannot be beyond the horizon for south polar Lambert azimuthal projection (reset to horizon at %lg)\n", hor_lat);
+					GMT->common.R.wesn[YHI] = hor_lat;
 				}
 				if (GMT->common.R.wesn[YLO] <= -90.0) GMT->current.proj.edge[0] = false;
 			}
@@ -3974,16 +3996,18 @@ GMT_LOCAL int gmtmap_init_ortho (struct GMT_CTRL *GMT, bool *search) {
 	else {
 		if (GMT->current.proj.polar) {	/* Polar aspect */
 			if (GMT->current.proj.north_pole) {
-				if (GMT->common.R.wesn[YLO] < 0.0) {
-					GMT_Report (GMT->parent, GMT_MSG_WARNING, "South boundary cannot be < 0 for north polar orthographic projection (reset to 0)\n");
-					GMT->common.R.wesn[YLO] = 0.0;
+				double hor_lat = 90.0 - GMT->current.proj.f_horizon;
+				if (GMT->common.R.wesn[YLO] < hor_lat) {
+					GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "South boundary cannot be beyond the horizon for north polar orthographic projection (reset to horizon at %lg)\n", hor_lat);
+					GMT->common.R.wesn[YLO] = hor_lat;
 				}
 				if (GMT->common.R.wesn[YHI] >= 90.0) GMT->current.proj.edge[2] = false;
 			}
 			else {
-				if (GMT->common.R.wesn[YHI] > 0.0) {
-					GMT_Report (GMT->parent, GMT_MSG_WARNING, "North boundary cannot be > 0 for south polar orthographic projection (reset to 0)\n");
-					GMT->common.R.wesn[YHI] = 0.0;
+				double hor_lat = GMT->current.proj.f_horizon - 90.0;
+				if (GMT->common.R.wesn[YHI] > hor_lat) {
+					GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "North boundary cannot be beyond the horizon for south polar orthographic projection (reset to horizon at %lg)\n", hor_lat);
+					GMT->common.R.wesn[YHI] = hor_lat;
 				}
 				if (GMT->common.R.wesn[YLO] <= -90.0) GMT->current.proj.edge[0] = false;
 			}
@@ -4551,6 +4575,8 @@ GMT_LOCAL int gmtmap_init_winkel (struct GMT_CTRL *GMT, bool *search) {
 		GMT->current.map.left_edge = &gmtproj_left_winkel;
 		GMT->current.map.right_edge = &gmtproj_right_winkel;
 		GMT->current.map.frame.horizontal = 2;
+		/* Unless MAP_ANNOT_OBLIQUE is set manually, we must add normal ticks for this pole-is-line projection */
+		if (!GMT->current.setting.map_annot_oblique_set) GMT->current.setting.map_annot_oblique |= GMT_OBL_ANNOT_NORMAL_TICKS;
 	}
 	gmtmap_setinfo (GMT, xmin, xmax, ymin, ymax, GMT->current.proj.pars[1]);
 	GMT->current.proj.fwd = &gmtproj_winkel;
@@ -4605,6 +4631,8 @@ GMT_LOCAL int gmtmap_init_eckert4 (struct GMT_CTRL *GMT, bool *search) {
 		GMT->current.map.left_edge = &gmtproj_left_eckert4;
 		GMT->current.map.right_edge = &gmtproj_right_eckert4;
 		GMT->current.map.frame.horizontal = 2;
+		/* Unless MAP_ANNOT_OBLIQUE is set manually, we must add normal ticks for this pole-is-line projection */
+		if (!GMT->current.setting.map_annot_oblique_set) GMT->current.setting.map_annot_oblique |= GMT_OBL_ANNOT_NORMAL_TICKS;
 	}
 	gmtmap_setinfo (GMT, xmin, xmax, ymin, ymax, GMT->current.proj.pars[1]);
 	GMT->current.proj.fwd = &gmtproj_eckert4;
@@ -4661,6 +4689,8 @@ GMT_LOCAL int gmtmap_init_eckert6 (struct GMT_CTRL *GMT, bool *search) {
 		GMT->current.map.left_edge = &gmtproj_left_eckert6;
 		GMT->current.map.right_edge = &gmtproj_right_eckert6;
 		GMT->current.map.frame.horizontal = 2;
+		/* Unless MAP_ANNOT_OBLIQUE is set manually, we must add normal ticks for this pole-is-line projection */
+		if (!GMT->current.setting.map_annot_oblique_set) GMT->current.setting.map_annot_oblique |= GMT_OBL_ANNOT_NORMAL_TICKS;
 	}
 	gmtmap_setinfo (GMT, xmin, xmax, ymin, ymax, GMT->current.proj.pars[1]);
 	GMT->current.proj.fwd = &gmtproj_eckert6;
@@ -4716,6 +4746,8 @@ GMT_LOCAL int gmtmap_init_robinson (struct GMT_CTRL *GMT, bool *search) {
 		GMT->current.map.left_edge = &gmtproj_left_robinson;
 		GMT->current.map.right_edge = &gmtproj_right_robinson;
 		GMT->current.map.frame.horizontal = 2;
+		/* Unless MAP_ANNOT_OBLIQUE is set manually, we must add normal ticks for this pole-is-line projection */
+		if (!GMT->current.setting.map_annot_oblique_set) GMT->current.setting.map_annot_oblique |= GMT_OBL_ANNOT_NORMAL_TICKS;
 	}
 	gmtmap_setinfo (GMT, xmin, xmax, ymin, ymax, GMT->current.proj.pars[1]);
 	GMT->current.proj.fwd = &gmtproj_robinson;
@@ -4793,15 +4825,20 @@ GMT_LOCAL int gmtmap_init_sinusoidal (struct GMT_CTRL *GMT, bool *search) {
 /*! . */
 GMT_LOCAL int gmtmap_init_cassini (struct GMT_CTRL *GMT, bool *search) {
 	bool too_big;
-	double xmin = 0.0, xmax = 0.0, ymin = 0.0, ymax = 0.0;
+	double xmin = 0.0, xmax = 0.0, ymin = 0.0, ymax = 0.0, L = 0.0, R = 0.0;
 
 	*search = GMT->common.R.oblique;
 
 	if (gmtmap_central_meridian_not_set (GMT))
 		gmtmap_set_default_central_meridian (GMT);
-	if ((GMT->current.proj.pars[0] - GMT->common.R.wesn[XLO]) > 90.0 || (GMT->common.R.wesn[XHI] - GMT->current.proj.pars[0]) > 90.0) {
-		GMT_Report (GMT->parent, GMT_MSG_ERROR, "Max longitude extension away from central meridian is limited to +/- 90 degrees\n");
-		return GMT_PROJECTION_ERROR;
+	if ((L = (GMT->current.proj.pars[0] - GMT->common.R.wesn[XLO])) > 90.0 || (R = (GMT->common.R.wesn[XHI] - GMT->current.proj.pars[0])) > 90.0) {
+		double D = 0.0;
+		if (L > 0.0) D = 360.0; else if (R > 0.0) D = -360.0;	/* Try the relevant 360-degree shift */
+		GMT->common.R.wesn[XLO] += D;	GMT->common.R.wesn[XHI] += D;	/* Try to shift the range */
+		if ((GMT->current.proj.pars[0] - GMT->common.R.wesn[XLO]) > 90.0 || (GMT->common.R.wesn[XHI] - GMT->current.proj.pars[0]) > 90.0) {
+			GMT_Report (GMT->parent, GMT_MSG_ERROR, "Max longitude extension away from central meridian is limited to +/- 90 degrees\n");
+			return GMT_PROJECTION_ERROR;
+		}
 	}
 	too_big = gmtmap_quicktm (GMT, GMT->current.proj.pars[0], 4.0);
 	if (too_big) gmtmap_set_spherical (GMT, true);	/* Cannot use ellipsoidal series for this area */
@@ -5103,10 +5140,9 @@ GMT_LOCAL int gmtmap_init_polyconic (struct GMT_CTRL *GMT, bool *search) {
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
 /*! . */
-void gmt_wesn_search (struct GMT_CTRL *GMT, double xmin, double xmax, double ymin, double ymax, double *west, double *east, double *south, double *north) {
+void gmt_wesn_search (struct GMT_CTRL *GMT, double xmin, double xmax, double ymin, double ymax, double *west, double *east, double *south, double *north, bool add_pad) {
 	double dx, dy, w, e, s, n, x, y, lat, *lon = NULL;
 	unsigned int i, j, k;
-	bool test_pole[2] = {true, true};
 
 	/* Search for extreme lon/lat coordinates by matching along the rectangular boundary */
 
@@ -5141,25 +5177,22 @@ void gmt_wesn_search (struct GMT_CTRL *GMT, double xmin, double xmax, double ymi
 
 	/* Then check if one or both poles are inside map; then the above won't be correct */
 
-	if (GMT->current.proj.projection_GMT == GMT_AZ_EQDIST) {	/* Must be careful since if a pole equals an antipode we get NaNs as coordinates */
-		gmt_geo_to_xy (GMT, GMT->current.proj.central_meridian, -90.0, &x, &y);
-		if (gmt_M_is_dnan (x) && gmt_M_is_dnan (y)) test_pole[0] = false;
-		gmt_geo_to_xy (GMT, GMT->current.proj.central_meridian, +90.0, &x, &y);
-		if (gmt_M_is_dnan (x) && gmt_M_is_dnan (y)) test_pole[1] = false;
-	}
-	if (test_pole[0] && !gmt_map_outside (GMT, GMT->current.proj.central_meridian, -90.0)) { s = -90.0; w = 0.0; e = 360.0; }
-	if (test_pole[1] && !gmt_map_outside (GMT, GMT->current.proj.central_meridian, +90.0)) { n = +90.0; w = 0.0; e = 360.0; }
+	if (GMT->current.proj.pole_in_map[0]) { s = -90.0; w = 0.0; e = 360.0; }
+	if (GMT->current.proj.pole_in_map[1]) { n = +90.0; w = 0.0; e = 360.0; }
 
-	s -= 0.1;	if (s < -90.0) s = -90.0;	/* Make sure point is not inside area, 0.1 is just a small arbitrary number */
-	n += 0.1;	if (n > 90.0) n = 90.0;		/* But don't go crazy beyond the pole */
-	w -= 0.1;	e += 0.1;	if (fabs (w - e) > 360.0) { w = 0.0; e = 360.0; }	/* Ensure max 360 range */
+	if (add_pad) {	/* Extend by 0.1 degrees, if possible */
+		s -= 0.1;	if (s < -90.0) s = -90.0;	/* Make sure point is not inside area, 0.1 is just a small arbitrary number */
+		n += 0.1;	if (n > 90.0) n = 90.0;		/* But don't go crazy beyond the pole */
+		w -= 0.1;	e += 0.1;	if (fabs (w - e) > 360.0) { w = 0.0; e = 360.0; }	/* Ensure max 360 range */
+	}
 	*west = w;	*east = e;	*south = s;	*north = n;	/* Pass back our findings */
 }
 
 /*! . */
-GMT_LOCAL void gmtmap_genper_search (struct GMT_CTRL *GMT, double *west, double *east, double *south, double *north) {
-	double w, e, s = 90.0, n = -90.0, lat, *lon = NULL, *work_x = NULL, *work_y = NULL;
+GMT_LOCAL void gmtmap_genper_search (struct GMT_CTRL *GMT, double *west, double *east, double *south, double *north, bool add_pad) {
+	double w, e, s = 90.0, n = -90.0, *work_x = NULL, *work_y = NULL;
 	uint64_t np, k;
+	struct GMT_DATASEGMENT *S = gmt_get_segment (GMT, 2);
 	/* Because the genper clip path may be a mix of straight borders and a curved horizon, we must determine this
 	 * clip path and search along it, getting lon,lat along the way, and find the extreme values to use. Before this
 	 * function was added, we ended up in the gmt_wesn_search function which would fail along the horizon in many
@@ -5172,27 +5205,33 @@ GMT_LOCAL void gmtmap_genper_search (struct GMT_CTRL *GMT, double *west, double 
 
 	/* Search for extreme lon/lat coordinates by matching along the genper boundary */
 
-	/* Need temp array to hold all the longitudes we compute */
-	lon = gmt_M_memory (GMT, NULL, np, double);
+	/* Need temp datasegment to hold all the longitudes and latitudes we compute */
+	gmt_alloc_segment (GMT, S, np, 2, 0, true);
 	for (k = 0; k < np; k++) {
-		gmt_xy_to_geo (GMT, &lon[k], &lat, work_x[k], work_y[k]);
-		if (lat < s) s = lat;
-		if (lat > n) n = lat;
+		gmt_xy_to_geo (GMT, &S->data[GMT_X][k], &S->data[GMT_Y][k], work_x[k], work_y[k]);
+		if (S->data[GMT_Y][k] < s) s = S->data[GMT_Y][k];
+		if (S->data[GMT_Y][k] > n) n = S->data[GMT_Y][k];
 	}
 	gmt_M_free (GMT, work_x);
 	gmt_M_free (GMT, work_y);
+	gmt_set_seg_minmax (GMT, GMT_IS_POLY, 2, S);	/* Update min/max of x/y */
 
-	gmtlib_get_lon_minmax (GMT, lon, np, &w, &e);	/* Determine lon-range by robust quandrant check */
-	gmt_M_free (GMT, lon);
+	gmtlib_get_lon_minmax (GMT, S->data[GMT_X], np, &w, &e);	/* Determine lon-range by robust quadrant check */
 
-	/* Then check if one or both poles are inside map; then the above won't be correct */
+	/* Then check if one or both poles are inside map; then the above won't be correct.
+	 * Because the clip path for genper may be some weird rounded octagon we must use the polygon directly. */
 
-	if (!gmt_map_outside (GMT, GMT->current.proj.central_meridian, -90.0)) { s = -90.0; w = 0.0; e = 360.0; }
-	if (!gmt_map_outside (GMT, GMT->current.proj.central_meridian, +90.0)) { n = +90.0; w = 0.0; e = 360.0; }
+	gmt_set_inside_mode (GMT, NULL, GMT_IOO_SPHERICAL);	/* Ensure spherical treatment */
+	if (gmt_inonout (GMT, GMT->current.proj.central_meridian, -90.0, S) == GMT_INSIDE) { s = -90.0; w = 0.0; e = 360.0; }
+	if (gmt_inonout (GMT, GMT->current.proj.central_meridian, +90.0, S) == GMT_INSIDE) { n = +90.0; w = 0.0; e = 360.0; }
 
-	s -= 0.1;	if (s < -90.0) s = -90.0;	/* Make sure point is not inside area, 0.1 is just a small arbitrary number */
-	n += 0.1;	if (n > 90.0) n = 90.0;		/* But don't go crazy beyond the pole */
-	w -= 0.1;	e += 0.1;	if (fabs (w - e) > 360.0) { w = 0.0; e = 360.0; }	/* Ensure max 360 range */
+	gmt_free_segment (GMT, &S);
+
+	if (add_pad) {	/* Extend by 0.1 degrees */
+		s -= 0.1;	if (s < -90.0) s = -90.0;	/* Make sure point is not inside area, 0.1 is just a small arbitrary number */
+		n += 0.1;	if (n > 90.0) n = 90.0;		/* But don't go crazy beyond the pole */
+		w -= 0.1;	e += 0.1;	if (fabs (w - e) > 360.0) { w = 0.0; e = 360.0; }	/* Ensure max 360 range */
+	}
 	*west = w;	*east = e;	*south = s;	*north = n;	/* Pass back our findings */
 }
 
@@ -5662,7 +5701,7 @@ GMT_LOCAL double gmtmap_rudoe_dist_meter (struct GMT_CTRL *GMT, double lonS, dou
 	 * If the station is in the southern hemisphere and the event in
 	 * in the northern, these equations give the longer, not the
 	 * shorter distance between the two locations.  Since the equations
-	 * are fairly messy, the simplist solution is to reverse the
+	 * are fairly messy, the simplest solution is to reverse the
 	 * meanings of the two locations for this case.)
 	 */
 
@@ -5832,7 +5871,7 @@ GMT_LOCAL bool gmtmap_near_a_point_cartesian (struct GMT_CTRL *GMT, double x, do
 GMT_LOCAL bool gmtmap_near_a_line_cartesian (struct GMT_CTRL *GMT, double lon, double lat, uint64_t seg, struct GMT_DATASEGMENT *S, unsigned int return_mindist, double *dist_min, double *x_near, double *y_near) {
 	bool perpendicular_only = false, interior, within;
 	uint64_t row0, row1;
-	double edge, dx, dy, xc, yc, s, s_inv, d, dist_AB, fraction;
+	double edge, dx, dy, xc, yc, s, s_inv, d, dist_AB, fraction, S_dist, S_dist2;
 	struct GMT_DATASEGMENT_HIDDEN *SH = gmt_get_DS_hidden (S);
 	/* gmtmap_near_a_line_cartesian works in one of two modes, depending on return_mindist.
 	   Since return_mindist is composed of two settings we must first set
@@ -5863,8 +5902,12 @@ GMT_LOCAL bool gmtmap_near_a_line_cartesian (struct GMT_CTRL *GMT, double lon, d
 
 	if (S->n_rows <= 0) return (false);	/* empty; skip */
 
-	if (return_mindist) SH->dist = 0.0;	/* Explicitly set dist to zero so the shortest distance can be found */
-
+	if (return_mindist)
+		S_dist = S_dist2 = 0.0;	/* Explicitly set dist to zero so the shortest distance can be found */
+	else {
+		S_dist = SH->dist;
+		S_dist2 = S_dist * S_dist;	/* Since we compute distances squared for Cartesian cases */
+	}
 	/* Find nearest point on this line */
 
 	for (row0 = 0; row0 < S->n_rows; row0++) {	/* loop over nodes on current line */
@@ -5875,7 +5918,7 @@ GMT_LOCAL bool gmtmap_near_a_line_cartesian (struct GMT_CTRL *GMT, double lon, d
 			else if (return_mindist == 3) { *x_near = (double)seg; *y_near = (double)row0;}		/* Instead update (seg, pt) of nearest point on the line */
 		}
 		interior = (row0 > 0 && row0 < (S->n_rows - 1));	/* Only false if we are processing one of the end points */
-		if (d <= SH->dist && (interior || !perpendicular_only)) return (true);		/* Node inside the critical distance; we are done */
+		if (d <= S_dist2 && (interior || !perpendicular_only)) return (true);		/* Node inside the critical distance; we are done */
 	}
 
 	if (S->n_rows < 2) return (false);	/* 1-point "line" is a point; skip segment check */
@@ -5887,13 +5930,13 @@ GMT_LOCAL bool gmtmap_near_a_line_cartesian (struct GMT_CTRL *GMT, double lon, d
 
 	for (row0 = 0, row1 = 1, within = false; row1 < S->n_rows; row0++, row1++) {	/* loop over straight segments on current line */
 		if (!return_mindist) {
-			edge = lon - SH->dist;
+			edge = lon - S_dist;
 			if (S->data[GMT_X][row0] < edge && S->data[GMT_X][row1] < edge) continue;	/* Left of square */
-			edge = lon + SH->dist;
+			edge = lon + S_dist;
 			if (S->data[GMT_X][row0] > edge && S->data[GMT_X][row1] > edge) continue;	/* Right of square */
-			edge = lat - SH->dist;
+			edge = lat - S_dist;
 			if (S->data[GMT_Y][row0] < edge && S->data[GMT_Y][row1] < edge) continue;	/* Below square */
-			edge = lat + SH->dist;
+			edge = lat + S_dist;
 			if (S->data[GMT_Y][row0] > edge && S->data[GMT_Y][row1] > edge) continue;	/* Above square */
 		}
 
@@ -5940,8 +5983,10 @@ GMT_LOCAL bool gmtmap_near_a_line_cartesian (struct GMT_CTRL *GMT, double lon, d
 			}
 			within = true;
 		}
-		if (d <= SH->dist) return (true);		/* Node inside the critical distance; we are done */
+		if (d <= S_dist2) return (true);		/* Node inside the critical distance; we are done */
 	}
+
+	if (return_mindist) *dist_min = sqrt (*dist_min);	/* Undo the squared distances */
 
 	return (within);	/* All tests failed, we are not close to the line(s), or we just return distance and interior (see comments above) */
 }
@@ -6319,7 +6364,7 @@ GMT_LOCAL double gmtmap_geodesic_dist_cos (struct GMT_CTRL *GMT, double lonS, do
 }
 
 /*! . */
-GMT_LOCAL double gmtmap_great_circle_dist_cos (struct GMT_CTRL *GMT, double lon1, double lat1, double lon2, double lat2) {
+double gmtlib_great_circle_dist_cos (struct GMT_CTRL *GMT, double lon1, double lat1, double lon2, double lat2) {
 	/* Return cosine of great circle distance */
 
 	double sin_half_squared = gmtmap_haversine (GMT, lon1, lat1, lon2, lat2);
@@ -6407,7 +6452,7 @@ GMT_LOCAL int gmtmap_set_distaz (struct GMT_CTRL *GMT, unsigned int mode, unsign
 			GMT_Report (GMT->parent, GMT_MSG_DEBUG, "%s distance calculation will be using geodesics in %s\n", type_name[type], unit_name);
 			break;
 		case GMT_DIST_COS+GMT_GREATCIRCLE:	/* 2-D lon, lat data, and Green's function needs cosine of spherical distance */
-			GMT->current.map.dist[type].func = &gmtmap_great_circle_dist_cos;
+			GMT->current.map.dist[type].func = &gmtlib_great_circle_dist_cos;
 			GMT->current.map.azimuth_func = &gmtmap_az_backaz_sphere;
 			GMT->current.map.second_point = &gmtmap_translate_point_spherical;
 			GMT_Report (GMT->parent, GMT_MSG_DEBUG, "%s distance calculation will be using great circle approximation with %s auxiliary latitudes and return cosine of spherical angles.\n",
@@ -6654,18 +6699,22 @@ double gmt_az_backaz (struct GMT_CTRL *GMT, double lonE, double latE, double lon
 GMT_LOCAL double gmtmap_auto_time_increment (double inc, char *unit) {
 	/* Given the first guess interval inc, determine closest time unit and return
 	 * the number of seconds in that unit and its code */
-	int k, kk = -1;
+	int k, kk = GMT_NOTSET;
 	double f;
 	static char units[6]  = {'S', 'M', 'H', 'D', 'O', 'Y'};
 	static double incs[6] = {1.0, GMT_MIN2SEC_F, GMT_HR2SEC_F, GMT_DAY2SEC_F, GMT_MON2SEC_F, GMT_YR2SEC_F};
-	for (k = 5; kk == -1 && k >= 0; k--) {	/* Find the largest time unit that is smaller than guess interval */
+	for (k = 5; kk == GMT_NOTSET && k >= 0; k--) {	/* Find the largest time unit that is smaller than guess interval */
 		f = inc / incs[k];
 		if (irint (f) >= 1)
 			kk = k;
 	}
-	if (kk == -1) kk = 0;	/* Safety valve */
+	if (kk == GMT_NOTSET) kk = 0;	/* Safety valve */
 	*unit = units[kk];
 	return (incs[kk]);
+}
+
+GMT_LOCAL bool gmtmap_polar_az (struct GMT_CTRL *GMT) {
+	return (gmt_M_is_azimuthal (GMT) && GMT->current.proj.polar && !GMT->common.R.oblique);
 }
 
 /*! . */
@@ -6697,18 +6746,33 @@ void gmt_auto_frame_interval (struct GMT_CTRL *GMT, unsigned int axis, unsigned 
 	if (axis == GMT_X) {
 		f = sxy * fabs (GMT->current.proj.rect[XHI] - GMT->current.proj.rect[XLO]);
 		d = fabs (GMT->common.R.wesn[XHI] - GMT->common.R.wesn[XLO]);
+		if (gmtmap_polar_az (GMT) && d > 120) f *= M_PI_2;	/* Circle perimeter is the right comparison to circular longitudes */
 	}
 	else if (axis == GMT_Y) {
 		f = sxy * fabs (GMT->current.proj.rect[YHI] - GMT->current.proj.rect[YLO]);
 		d = fabs (GMT->common.R.wesn[YHI] - GMT->common.R.wesn[YLO]);
+		if (gmtmap_polar_az (GMT)) f /= 4;	/* Latitude range is only covering half the plot */
 	}
 	else {
 		f = sz * fabs (GMT->current.proj.zmax - GMT->current.proj.zmin);
 		d = fabs (GMT->common.R.wesn[ZHI] - GMT->common.R.wesn[ZLO]);
 	}
 	f *= GMT->session.u2u[GMT_INCH][GMT_PT];	/* Change to points */
+
+#ifndef NO_THEMES
+	if (GMT->current.setting.run_mode == GMT_MODERN && gmt_M_axis_is_geo (GMT, axis)) {	/* Need more space for degree symbol and WESN letters not considered in the algorithm */
+		if (strchr (GMT->current.setting.format_geo_map, 'F'))	/* Need more space for degree symbol and letter */
+			d *= 1.2;
+		else	/* Just more space for degree symbol */
+			d *= 1.1;
+	}
+#endif
+
 	/* First guess of interval */
-	d *= MAX (0.05, MIN (5.0 * GMT->current.setting.font_annot[item].size / f, 0.20));
+	if (gmtmap_polar_az (GMT))
+		d *= MAX (0.05, MIN (5.0 * GMT->current.setting.font_annot[item].size / f, 0.3));
+	else
+		d *= MAX (0.05, MIN (5.0 * GMT->current.setting.font_annot[item].size / f, 0.2));
 
 	/* Now determine 'round' major and minor tick intervals */
 	if (gmt_M_axis_is_geo (GMT, axis))	/* Geographical coordinate */
@@ -6770,7 +6834,11 @@ void gmt_auto_frame_interval (struct GMT_CTRL *GMT, unsigned int axis, unsigned 
 	}
 	if (n) {
 		while (i < n && maj[i] < d) i++;	/* Wind up to largest reasonable interval */
-		d = maj[i] * p, f = sub[i] * p;		/* Scale up intervals in multiple of unit */
+		if ((GMT->current.proj.projection == GMT_MOLLWEIDE || GMT->current.proj.projection == GMT_HAMMER || \
+			GMT->current.proj.projection == GMT_ECKERT4) && i == 6) /* Rounded misc. projections */
+			d = maj[i-1] * p; 		/* Annotation interval needs to be less than 90 */
+		else d = maj[i] * p;		/* Scale up intervals in multiple of unit */
+		f = sub[i] * p;
 	}
 	if (is_time) {	/* Last check to change a 12 month unit to 1 year and 24 hours to 1 day */
 		if (unit == 'O' && d == 12.0) d = 1.0, f /= 12.0, unit = 'Y';
@@ -7165,7 +7233,7 @@ bool gmt_map_outside (struct GMT_CTRL *GMT, double lon, double lat) {
 	GMT->current.map.prev_y_status = GMT->current.map.this_y_status;
 	if (GMT->current.map.outside == NULL) {
 		GMT_Report (GMT->parent, GMT_MSG_ERROR, "gmt_map_outside: FATAL ERROR - the pointer to the projection function is NULL.\n");
-		return -1;
+		return GMT_NOTSET;
 	}
 	return ((*GMT->current.map.outside) (GMT, lon, lat));
 }
@@ -7400,6 +7468,15 @@ int gmtlib_great_circle_intersection (struct GMT_CTRL *GMT, double A[], double B
 	return (0);				/* Return zero if intersection is between A and B */
 }
 
+GMT_LOCAL void gmtmap_swap_if_needed (int way, double previous, double *xc, double *yc) {
+	/* Check if we need to swap the order of (xc,yc).  Note: xc may be yc and vice versa; see the calls */
+	if (way == 0) return;	/* Nothing to consider */
+	if ((way > 0 && xc[0] > previous) || (way < 0 && xc[1] > previous)) {	/* Flip the order of xc,yc to fit the need */
+		gmt_M_double_swap (xc[0], xc[1]);
+		gmt_M_double_swap (yc[0], yc[1]);
+	}
+}
+
 /*! . */
 uint64_t *gmtlib_split_line (struct GMT_CTRL *GMT, double **xx, double **yy, uint64_t *nn, bool add_crossings) {
 	/* Accepts x/y array for a line in projected inches and looks for
@@ -7453,17 +7530,11 @@ uint64_t *gmtlib_split_line (struct GMT_CTRL *GMT, double **xx, double **yy, uin
 			if (add_crossings) {	/* Find and insert the crossings */
 				if (way[k] == -2 || way[k] == +2) {	/* Jump in y for TM */
 					gmtmap_get_crossings_y (GMT, xc, yc, xin[i], yin[i], xin[i-1], yin[i-1]);
-					if (way[k] == -2) {	/* Add top border point first */
-						gmt_M_double_swap (xc[0], xc[1]);
-						gmt_M_double_swap (yc[0], yc[1]);
-					}
+					gmtmap_swap_if_needed (way[k], y[j-1], yc, xc);	/* Passing previous y and yc, xc for y-crossing */
 				}
-				else {	/* Jump in x */
+				else {	/* Jump in x for any projection with periodic w/e boundaries */
 					gmtmap_get_crossings_x (GMT, xc, yc, xin[i], yin[i], xin[i-1], yin[i-1]);
-					if (way[k] == 1) {	/* Add right border point first */
-						gmt_M_double_swap (xc[0], xc[1]);
-						gmt_M_double_swap (yc[0], yc[1]);
-					}
+					gmtmap_swap_if_needed (way[k], x[j-1], xc, yc);	/* Passing previous x and xc, yc for x-crossing */
 				}
 				x[j] = xc[0];	y[j++] = yc[0];	/* End of one segment */
 				jc = j;		/* Node of first point in next segment */
@@ -8016,16 +8087,18 @@ int gmt_grd_project (struct GMT_CTRL *GMT, struct GMT_GRID *I, struct GMT_GRID *
 
 	/* Only input grid MUST have at least 2 rows/cols padding - otherwise we must allocate a temp grid */
 	if (I->header->pad[XLO] < 2 || I->header->pad[XHI] < 2 || I->header->pad[YLO] < 2 || I->header->pad[YHI] < 2) {
-		unsigned int pad2[4] = {2, 2, 2, 2};
+		unsigned int def_pad[4], pad2[4] = {2, 2, 2, 2};
 		GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "gmt_grd_project: Input grid has insufficient padding - create and work on a duplicate with r row/col pad\n");
-		if ((I2 = GMT_Duplicate_Data (GMT->parent, GMT_IS_GRID, GMT_DUPLICATE_DATA, I)) == NULL) {
-			GMT_Report (GMT->parent, GMT_MSG_ERROR, "gmt_grd_project: Unable to duplicate grid\n");
+		gmt_M_memcpy (def_pad, GMT->current.io.pad, 4, unsigned int);	/* Save default pad */
+		gmt_M_memcpy (GMT->current.io.pad, pad2, 4, unsigned int);		/* Change default pad */
+		if ((I2 = GMT_Duplicate_Data (GMT->parent, GMT_IS_GRID, GMT_DUPLICATE_DATA | GMT_DUPLICATE_RESET, I)) == NULL) {
+			GMT_Report (GMT->parent, GMT_MSG_ERROR, "gmt_grd_project: Unable to duplicate grid with padding\n");
 			return GMT_RUNTIME_ERROR;
 		}
-		gmt_grd_pad_on (GMT, I2, pad2);	/* Add pad */
 		gmt_BC_init (GMT, I2->header);	/* Initialize grid interpolation and boundary condition parameters */
 		gmt_grd_BC_set (GMT, I2, GMT_IN);	/* Set boundary conditions */
 		I = I2;	/* Use this input grid instead */
+		gmt_M_memcpy (GMT->current.io.pad, def_pad, 4, unsigned int);		/* Restore default pad */
 	}
 
 	GMT_Report (GMT->parent, GMT_MSG_DEBUG, "gmt_grd_project: In [%.12g/%.12g/%.12g/%.12g] and out [%.12g/%.12g/%.12g/%.12g]\n",
@@ -8941,11 +9014,11 @@ int gmt_set_datum (struct GMT_CTRL *GMT, char *text, struct GMT_DATUM *D) {
 		char ellipsoid[GMT_LEN256] = {""}, dr[GMT_LEN256] = {""};
 		if (sscanf (text, "%[^:]:%s", ellipsoid, dr) != 2) {
 			GMT_Report (GMT->parent, GMT_MSG_ERROR, "Malformed <ellipsoid>:<dr> argument!\n");
-			return (-1);
+			return (GMT_NOTSET);
 		}
 		if (sscanf (dr, "%lf,%lf,%lf", &D->xyz[GMT_X], &D->xyz[GMT_Y], &D->xyz[GMT_Z]) != 3) {
 			GMT_Report (GMT->parent, GMT_MSG_ERROR, "Malformed <x>,<y>,<z> argument!\n");
-			return (-1);
+			return (GMT_NOTSET);
 		}
 		if ((i = gmt_get_ellipsoid (GMT, ellipsoid)) >= 0) {	/* This includes looking for format <a>,<1/f> */
 			D->a = GMT->current.setting.ref_ellipsoid[i].eq_radius;
@@ -8954,22 +9027,22 @@ int gmt_set_datum (struct GMT_CTRL *GMT, char *text, struct GMT_DATUM *D) {
 		}
 		else {
 			GMT_Report (GMT->parent, GMT_MSG_ERROR, "Ellipsoid %s not recognized!\n", ellipsoid);
-			return (-1);
+			return (GMT_NOTSET);
 		}
 	}
 	else {		/* Gave a Datum ID tag [ 0-(GMT_N_DATUMS-1)] */
 		int k;
 		if (sscanf (text, "%d", &i) != 1) {
 			GMT_Report (GMT->parent, GMT_MSG_ERROR, "Malformed or unrecognized <datum> argument (%s)!\n", text);
-			return (-1);
+			return (GMT_NOTSET);
 		}
 		if (i < 0 || i >= GMT_N_DATUMS) {
 			GMT_Report (GMT->parent, GMT_MSG_ERROR, "Datum ID (%d) outside valid range (0-%d)!\n", i, GMT_N_DATUMS-1);
-			return (-1);
+			return (GMT_NOTSET);
 		}
 		if ((k = gmt_get_ellipsoid (GMT, GMT->current.setting.proj_datum[i].ellipsoid)) < 0) {	/* This should not happen... */
 			GMT_Report (GMT->parent, GMT_MSG_ERROR, "Ellipsoid %s not recognized!\n", GMT->current.setting.proj_datum[i].ellipsoid);
-			return (-1);
+			return (GMT_NOTSET);
 		}
 		D->a = GMT->current.setting.ref_ellipsoid[k].eq_radius;
 		D->f = GMT->current.setting.ref_ellipsoid[k].flattening;
@@ -9225,6 +9298,8 @@ unsigned int gmtlib_map_latcross (struct GMT_CTRL *GMT, double lat, double west,
 				if (GMT->current.proj.got_azimuths) X[nc].sides[0] = (X[nc].sides[0] + 2) % 4;
 				GMT->current.map.corner = 0;
 			}
+			gmt_M_memcpy (X[nc].lon, xlon, 2U, double);
+			gmt_M_memcpy (X[nc].lat, xlat, 2U, double);
 		}
 		else if (GMT->current.map.is_world)	/* Deal with possibility of wrapping around 360 */
 			nx = (*GMT->current.map.wrap_around_check) (GMT, X[nc].angle, last_x, last_y, this_x, this_y, X[nc].xx, X[nc].yy, X[nc].sides);
@@ -9284,6 +9359,8 @@ unsigned int gmtlib_map_loncross (struct GMT_CTRL *GMT, double lon, double south
 				X[nc].sides[0] = (GMT->current.map.corner < 3) ? 0 : 2;
 				GMT->current.map.corner = 0;
 			}
+			gmt_M_memcpy (X[nc].lon, xlon, 2U, double);
+			gmt_M_memcpy (X[nc].lat, xlat, 2U, double);
 		}
 		else if (GMT->current.map.is_world)	/* Deal with possibility of wrapping around 360 */
 			nx = (*GMT->current.map.wrap_around_check) (GMT, X[nc].angle, last_x, last_y, this_x, this_y, X[nc].xx, X[nc].yy, X[nc].sides);
@@ -9316,6 +9393,19 @@ unsigned int gmtlib_map_loncross (struct GMT_CTRL *GMT, double lon, double south
 		gmt_M_free (GMT, X);
 
 	return (nc);
+}
+
+void gmtmap_reset_oblique_settings (struct GMT_CTRL *GMT) {
+	/* The modern mode default for MAP_ANNOT_OBLIQUE has settings that only makes sense for oblique plots with rectangular borders.
+	 * Thus, if the current projection is not like that then we reset the default to a more benign default setting.  However, if
+	 * the user has actively changed the MAP_ANNOT_OBLIQUE value then we do nothing. */
+
+	if (GMT->current.setting.map_annot_oblique_set) return;	/* User changed MAP_ANNOT_OBLIQUE so we cannot reset anything */
+	if (GMT->common.R.oblique) return;	/* These are the appropriate defaults for oblique projections with rectangular borders */
+
+	GMT_Report (GMT->parent, GMT_MSG_DEBUG, "Reset MAP_ANNOT_OBLIQUE to anywhere\n");
+
+	GMT->current.setting.map_annot_oblique = GMT_OBL_ANNOT_ANYWHERE;	/* Reset to non-oblique map defaults */
 }
 
 int gmt_proj_setup (struct GMT_CTRL *GMT, double wesn[]) {
@@ -9408,6 +9498,8 @@ int gmt_proj_setup (struct GMT_CTRL *GMT, double wesn[]) {
 	GMT->current.map.lon_wrap = true;
 	GMT->current.map.lat_wrap = false;
 	GMT->current.map.lon_wrap_range = 360.0;
+
+	gmtmap_reset_oblique_settings (GMT);	/* Maybe reset MAP_ANNOT_OBLIQUE defaults depending on situation */
 
 	switch (GMT->current.proj.projection) {
 
@@ -9565,14 +9657,36 @@ int gmt_proj_setup (struct GMT_CTRL *GMT, double wesn[]) {
 	return (error);
 }
 
+int gmt_map_perimeter_search (struct GMT_CTRL *GMT, double *wesn, bool add_pad) {
+	/* Loop around rectangular perimeter and determine min/max lon/lat extent.
+	 * If add_pad is true then we extend by 0.1 degrees (as per GMT historical settings) */
+	int error = GMT_NOERROR;
+	if (GMT->current.proj.projection_GMT == GMT_GENPER)	/* Need special considerations for this projection */
+		gmtmap_genper_search (GMT, &GMT->common.R.wesn[XLO], &GMT->common.R.wesn[XHI], &GMT->common.R.wesn[YLO], &GMT->common.R.wesn[YHI], add_pad);
+	else	/* Search along the projected border */
+		gmt_wesn_search (GMT, GMT->current.proj.rect[XLO], GMT->current.proj.rect[XHI], GMT->current.proj.rect[YLO], GMT->current.proj.rect[YHI], &GMT->common.R.wesn[XLO], &GMT->common.R.wesn[XHI], &GMT->common.R.wesn[YLO], &GMT->common.R.wesn[YHI], add_pad);
+	GMT->current.map.dlon = (GMT->common.R.wesn[XHI] - GMT->common.R.wesn[XLO]) / GMT->current.map.n_lon_nodes;
+	GMT->current.map.dlat = (GMT->common.R.wesn[YHI] - GMT->common.R.wesn[YLO]) / GMT->current.map.n_lat_nodes;
+	if (gmt_M_is_azimuthal(GMT) && GMT->common.R.oblique) {
+		if ((error = gmtmap_horizon_search (GMT, wesn[XLO], wesn[XHI], wesn[YLO], wesn[YHI], GMT->current.proj.rect[XLO], GMT->current.proj.rect[XHI], GMT->current.proj.rect[YLO], GMT->current.proj.rect[YHI])))
+			return (error);
+	}
+	GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "gmt_map_setup perimeter search region: %.16lg/%.16lg/%.16lg/%.16lg.\n", 
+		GMT->common.R.wesn[XLO], GMT->common.R.wesn[XHI], GMT->common.R.wesn[YLO], GMT->common.R.wesn[YHI]);
+	return (GMT_NOERROR);
+}
+
 /*! . */
 int gmt_map_setup (struct GMT_CTRL *GMT, double wesn[]) {
 	unsigned int i;
 	int error;
 	bool search, double_auto[6];
+	bool test_pole[2] = {true, true}, separate_intervals = false;
 	double scale, i_scale;
 
 	if ((error = gmt_proj_setup (GMT, wesn)) != GMT_NOERROR) goto gmt_map_setup_end;
+
+	gmt_set_undefined_defaults (GMT, sqrt (GMT->current.map.width * GMT->current.map.height), false);	/* We must change any undefined defaults given max plot dimension */
 
 	search = GMT->current.proj.search;
 
@@ -9590,9 +9704,26 @@ int gmt_map_setup (struct GMT_CTRL *GMT, double wesn[]) {
 	gmt_auto_frame_interval (GMT, GMT_Y, GMT_ANNOT_LOWER);
 	gmt_auto_frame_interval (GMT, GMT_Z, GMT_ANNOT_LOWER);
 
-	/* Now set the pairs of automatically set intervals to be the same in both x- and y-direction */
+	/* Then check if one or both poles are inside map.  If they are then the longitude range will be 360
+	 * and depending on the latitude extent it may not make sense to use the coarse longitude-spacing determined
+	 * also for the latitude spacing.  We check this and if a pole is inside and if the latitude range is < 1/4
+	 * of that of the longitude (e.g., 90 degrees for a 0-360 global map) we go separate. */
+
+	if (GMT->current.proj.projection_GMT == GMT_AZ_EQDIST) {	/* Must be careful since if a pole equals an antipode we get NaNs as coordinates */
+		double x, y;
+		gmt_geo_to_xy (GMT, GMT->current.proj.central_meridian, -90.0, &x, &y);
+		if (gmt_M_is_dnan (x) && gmt_M_is_dnan (y)) test_pole[0] = false;
+		gmt_geo_to_xy (GMT, GMT->current.proj.central_meridian, +90.0, &x, &y);
+		if (gmt_M_is_dnan (x) && gmt_M_is_dnan (y)) test_pole[1] = false;
+	}
+	if (test_pole[0] && !gmt_map_outside (GMT, GMT->current.proj.central_meridian, -90.0)) GMT->current.proj.pole_in_map[0] = separate_intervals = true;
+	if (test_pole[1] && !gmt_map_outside (GMT, GMT->current.proj.central_meridian, +90.0)) GMT->current.proj.pole_in_map[1] = separate_intervals = true;
+	if (separate_intervals && (GMT->common.R.wesn[YHI] - GMT->common.R.wesn[YLO]) / (GMT->common.R.wesn[XHI] - GMT->common.R.wesn[XLO]) > 0.25)
+		separate_intervals = false;	/* E.g, for a whole global hemisphere we keep them the same, else we adjust individually */
+
+	/* Now set the pairs of automatically set intervals to be the same in both x- and y-direction, except when a geographic pole is inside an oblique map frame */
 	for (i = 0; i < 6; i++) {
-		if (double_auto[i]) GMT->current.map.frame.axis[GMT_X].item[i].interval = GMT->current.map.frame.axis[GMT_Y].item[i].interval =
+		if (double_auto[i] && !separate_intervals) GMT->current.map.frame.axis[GMT_X].item[i].interval = GMT->current.map.frame.axis[GMT_Y].item[i].interval =
 		MAX (GMT->current.map.frame.axis[GMT_X].item[i].interval, GMT->current.map.frame.axis[GMT_Y].item[i].interval);
 	}
 
@@ -9608,15 +9739,8 @@ int gmt_map_setup (struct GMT_CTRL *GMT, double wesn[]) {
 	}
 
 	if (search) {	/* Loop around rectangular perimeter and determine min/max lon/lat extent */
-		if (GMT->current.proj.projection_GMT == GMT_GENPER)	/* Need special considerations for this projection */
-			gmtmap_genper_search (GMT, &GMT->common.R.wesn[XLO], &GMT->common.R.wesn[XHI], &GMT->common.R.wesn[YLO], &GMT->common.R.wesn[YHI]);
-		else	/* Search along the projected boarder */
-			gmt_wesn_search (GMT, GMT->current.proj.rect[XLO], GMT->current.proj.rect[XHI], GMT->current.proj.rect[YLO], GMT->current.proj.rect[YHI], &GMT->common.R.wesn[XLO], &GMT->common.R.wesn[XHI], &GMT->common.R.wesn[YLO], &GMT->common.R.wesn[YHI]);
-		GMT->current.map.dlon = (GMT->common.R.wesn[XHI] - GMT->common.R.wesn[XLO]) / GMT->current.map.n_lon_nodes;
-		GMT->current.map.dlat = (GMT->common.R.wesn[YHI] - GMT->common.R.wesn[YLO]) / GMT->current.map.n_lat_nodes;
-		if (gmt_M_is_azimuthal(GMT) && GMT->common.R.oblique) {
-			if ((error = gmtmap_horizon_search (GMT, wesn[XLO], wesn[XHI], wesn[YLO], wesn[YHI], GMT->current.proj.rect[XLO], GMT->current.proj.rect[XHI], GMT->current.proj.rect[YLO], GMT->current.proj.rect[YHI]))) goto gmt_map_setup_end;
-		}
+		if ((error = gmt_map_perimeter_search (GMT, wesn, true)))
+			goto gmt_map_setup_end;
 	}
 
 	/* Maximum step size (in degrees) used for interpolation of line segments along great circles (or meridians/parallels)  before they are plotted */
@@ -9799,7 +9923,7 @@ struct GMT_DATASEGMENT * gmt_get_smallcircle (struct GMT_CTRL *GMT, double plon,
 	S->data[GMT_X][n - 1] = S->data[GMT_X][0];		/* Make really sure the polygon is closed */
 	S->data[GMT_Y][n - 1] = S->data[GMT_Y][0];
 	S->n_rows = n;
-	gmt_set_seg_polar (GMT, S);				/* Prepare if a polar cap */
+	gmt_set_seg_minmax (GMT, GMT_IS_POLY, 2, S);
 	return (S);	/* Pass out the results */
 }
 
@@ -9872,7 +9996,10 @@ struct GMT_DATASEGMENT * gmt_get_geo_ellipse (struct GMT_CTRL *GMT, double lon, 
 
 	/* Explicitly close the polygon */
 	px[N] = px[0], py[N] = py[0];
-	snprintf (header, GMT_LEN256, "Ellipse around %g/%g with major/minor axes %g/%g km and major axis azimuth %g approximated by %" PRIu64 " points", lon, lat, major_km, minor_km, azimuth, N);
+	if (doubleAlmostEqual (major_km, minor_km))
+		snprintf (header, GMT_LEN256, "Circle around %g/%g with diameter %g km approximated by %" PRIu64 " points", lon, lat, major_km, N);
+	else
+		snprintf (header, GMT_LEN256, "Ellipse around %g/%g with major/minor axes %g/%g km and major axis azimuth %g approximated by %" PRIu64 " points", lon, lat, major_km, minor_km, azimuth, N);
 	S->header = strdup (header);
 	return (S);
 }

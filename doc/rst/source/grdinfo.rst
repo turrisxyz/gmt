@@ -12,7 +12,7 @@ Synopsis
 
 .. include:: common_SYN_OPTs.rst_
 
-**gmt grdinfo** *grdfiles* [ |-C|\ [**n**\|\ **t**\] ]
+**gmt grdinfo** *ingrid* [ |-C|\ [**n**\|\ **t**\] ]
 [ |-D|\ [*xoff*\ [/*yoff*]][**+i**] ]
 [ |-E|\ [**x**\|\ **y**][**+l**\|\ **L**\|\ **u**\|\ **U**] ]
 [ |-F| ]
@@ -48,9 +48,10 @@ With option **-Q** we can also report information for 3-D data cubes.
 Required Arguments
 ------------------
 
-*grdfile*
-    The name of one or several 2-D grid files. (See :ref:`Grid File Formats
-    <grd_inout_full>`).
+.. |Add_ingrid| replace:: The name of one or several 2-D grid files. 
+.. include:: explain_grd_inout.rst_
+    :start-after: ingrid-syntax-begins
+    :end-before: ingrid-syntax-ends
 
 Optional Arguments
 ------------------
@@ -151,31 +152,31 @@ Optional Arguments
     All input files must be data 3-D netCDF data cube files [all files are 2-D grids].
     Not compatible with **-D**, **-E**, **-F**, and **-Ib**.
 
-.. _-R:
-
-.. |Add_-R| replace:: Using the **-R** option
-    will select a subsection of the input grid(s). If this subsection
-    exceeds the boundaries of the grid, only the common region will be extracted.
-    If **-Q** is used you must also append limits in the *z* dimension.
+.. |Add_-R| replace:: Using the **-R** option will select a subsection of the input grid(s). If this subsection
+    exceeds the boundaries of the grid, only the common region will be extracted. If **-Q** is used you must also
+    append limits in the *z* dimension. |Add_-R_links|
 .. include:: explain_-R.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 .. _-T:
 
 **-T**\ [*dv*]\ [**+a**\ [*alpha*]]\ [**+s**]
     Determine min and max data value.  If *dv* is provided then we first round these
     values off to multiples of *dv*. To exclude the two tails of the distribution
-    when determining the min and max you can add **+a** to set the *alpha*
+    when determining the min and max you can add **+a** to set the combined *alpha*
     value (in percent [2]): We then sort the values, exclude the data in the
     0.5*\ *alpha* and 100 - 0.5*\ *alpha* tails, and revise the min and max.
+    Give *alpha* in the format *alphaL*/*alphaR* to select unequal tail areas.
     To force a symmetrical range about zero, using minus/plus the max
     absolute value of the two extremes, append **+s**. We report the
     result via the text string **-T**\ *vmin/vmax* or **-T**\ *vmin/vmax/dv*
     (if *dv* was given) as expected by :doc:`makecpt`.
 
-.. _-V:
-
-.. |Add_-V| unicode:: 0x20 .. just an invisible code
+.. |Add_-V| replace:: |Add_-V_links|
 .. include:: explain_-V.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 .. |Add_-f| unicode:: 0x20 .. just an invisible code
 .. include:: explain_-f.rst_
@@ -205,5 +206,8 @@ To learn about the extreme values and coordinates in the 3-D data cube S362ANI_k
 See Also
 --------
 
-:doc:`gmt`, :doc:`grd2cpt`,
-:doc:`grd2xyz`, :doc:`grdedit`
+:doc:`gmt`,
+:doc:`grd2cpt`,
+:doc:`grd2xyz`,
+:doc:`grdedit`,
+:doc:`grdselect`

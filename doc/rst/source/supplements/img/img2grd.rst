@@ -46,8 +46,10 @@ Required Arguments
 
 .. _-G:
 
-**-G**\ *grdfile*
-    *grdfile* is the name of the output grid file.
+.. |Add_outgrid| replace:: Give the name of the output grid file.
+.. include:: /explain_grd_inout.rst_
+    :start-after: outgrid-syntax-begins
+    :end-before: outgrid-syntax-ends
 
 .. _-R:
 
@@ -146,11 +148,11 @@ Optional Arguments
     interpolated points; **-T**\ *3* gets 1 at constrained points and 0
     at interpolated points [Default is 1].
 
-.. _-V:
-
 .. |Add_-V| replace:: Particularly recommended here, as it is
-    helpful to see how the coordinates are adjusted.
-.. include:: ../../explain_-V.rst_
+    helpful to see how the coordinates are adjusted. |Add_-V_links|
+.. include:: /explain_-V.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 .. _-W:
 

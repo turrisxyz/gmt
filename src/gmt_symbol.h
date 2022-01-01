@@ -41,6 +41,7 @@
 
 /* PANEL attributes are used by pslegend, psscale, psimage, gmtlogo */
 
+#define GMT_TAG_CLEARANCE	2.0	/* In points */
 #define GMT_FRAME_CLEARANCE	4.0	/* In points */
 #define GMT_FRAME_GAP		2.0	/* In points */
 #define GMT_FRAME_RADIUS	6.0	/* In points */
@@ -98,6 +99,7 @@ struct GMT_CUSTOM_SYMBOL_ITEM {
 	int operator, var_pen, var[CUSTOM_SYMBOL_MAXVAR];	/* For conditionals: var[0] refers to variable on left hand side of operator, var[1] and var[2] to the right hand */
 	enum gmt_enum_custsymb conditional;
 	unsigned int justify;	/* For macro code l text justification [PSL_MC] */
+	unsigned int angular;	/* 0 or GMT_SYMBOL_VARROTATE if constant angles given as azimuths */
 	bool negate, is_var[CUSTOM_SYMBOL_MAXVAR];
 	struct GMT_FILL *fill;
 	struct GMT_PEN *pen;

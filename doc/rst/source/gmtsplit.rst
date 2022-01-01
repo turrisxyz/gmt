@@ -29,6 +29,7 @@ Synopsis
 [ |SYN_OPT-h| ]
 [ |SYN_OPT-i| ]
 [ |SYN_OPT-q| ]
+[ |SYN_OPT-s| ]
 [ |SYN_OPT-:| ]
 [ |SYN_OPT--| ]
 
@@ -104,7 +105,7 @@ Optional Arguments
 
 **-N**\ *template*
     Write each segment to a separate output file [Default writes a
-    multiple segment file to stdout]. Append a format template for the
+    multiple segment file to standard output]. Append a format template for the
     individual file names; this template **must** contain a C format
     specifier that can format an integer argument (the running segment
     number across all tables); this is usually %d but could be %08d
@@ -134,10 +135,10 @@ Optional Arguments
     distances are Cartesian in same units as x,y and angles are
     counter-clockwise from horizontal].
 
-.. _-V:
-
-.. |Add_-V| unicode:: 0x20 .. just an invisible code
+.. |Add_-V| replace:: |Add_-V_links|
 .. include:: explain_-V.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 .. |Add_-bi| replace:: [Default is 2, 3, or 5 input columns as set by **-S**].
 .. include:: explain_-bi.rst_
@@ -163,6 +164,8 @@ Optional Arguments
 .. include:: explain_-icols.rst_
 
 .. include:: explain_-q.rst_
+
+.. include:: explain_-s.rst_
 
 .. include:: explain_colon.rst_
 

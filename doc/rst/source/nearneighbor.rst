@@ -14,17 +14,17 @@ Synopsis
 
 **gmt nearneighbor** [ *table* ] |-G|\ *outgrid*
 |SYN_OPT-I|
-|-N|\ *sectors*\ [**+m**\ *min_sectors*]\ \|\ **n**
 |SYN_OPT-R|
 |-S|\ *search_radius*
 [ |-E|\ *empty* ]
+[|-N|\ *sectors*\ [**+m**\ *min_sectors*]\ \|\ **n**]
 [ |SYN_OPT-V| ]
 [ |-W| ]
+[ |SYN_OPT-a| ]
 [ |SYN_OPT-bi| ]
 [ |SYN_OPT-di| ]
 [ |SYN_OPT-e| ]
 [ |SYN_OPT-f| ]
-[ |SYN_OPT-g| ]
 [ |SYN_OPT-h| ]
 [ |SYN_OPT-i| ]
 [ |SYN_OPT-n| ]
@@ -76,31 +76,19 @@ Required Arguments
 
 .. _-G:
 
-**-G**\ *outgrid*
-    Give the name of the output grid file.
+.. |Add_outgrid| replace:: Give the name of the output grid file.
+.. include:: /explain_grd_inout.rst_
+    :start-after: outgrid-syntax-begins
+    :end-before: outgrid-syntax-ends
 
 .. _-I:
 
 .. include:: explain_-I.rst_
 
-.. _-N:
-
-**-N**\ *sectors*\ [**+m**\ *min_sectors*]\|\ **n**
-    The circular search area centered on each node is divided into *sectors*
-    sectors. Average values will only be computed if there is *at least*
-    one value inside each of at least *min_sectors* of the sectors for a given
-    node. Nodes that fail this test are assigned the value NaN (but see
-    **-E**). If **+m** is omitted then *min_sectors* is set to be at least 50%
-    of *sectors* (i.e., rounded up to next integer) [Default is a quadrant
-    search with 100% coverage, i.e., *sectors* = *min_sectors* = 4]. Note
-    that only the nearest value per sector enters into the averaging; the
-    more distant points are ignored.  Alternatively, use **-Nn** to call
-    GDALʻs nearest neighbor algorithm instead.
-
-.. _-R:
-
-.. |Add_-R| unicode:: 0x20 .. just an invisible code
+.. |Add_-R| replace:: |Add_-R_links|
 .. include:: explain_-R.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 .. _-S:
 
@@ -116,10 +104,24 @@ Optional Arguments
 **-E**\ *empty*
     Set the value assigned to empty nodes [NaN].
 
-.. _-V:
-
-.. |Add_-V| unicode:: 0x20 .. just an invisible code
+.. |Add_-V| replace:: |Add_-V_links|
 .. include:: explain_-V.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
+
+.. _-N:
+
+**-N**\ *sectors*\ [**+m**\ *min_sectors*]\|\ **n**
+    The circular search area centered on each node is divided into *sectors*
+    sectors. Average values will only be computed if there is *at least*
+    one value inside each of at least *min_sectors* of the sectors for a given
+    node. Nodes that fail this test are assigned the value NaN (but see
+    **-E**). If **+m** is omitted then *min_sectors* is set to be at least 50%
+    of *sectors* (i.e., rounded up to next integer) [Default is a quadrant
+    search with 100% coverage, i.e., *sectors* = *min_sectors* = 4]. Note
+    that only the nearest value per sector enters into the averaging; the
+    more distant points are ignored.  Alternatively, use **-Nn** to call
+    GDALʻs nearest neighbor algorithm instead.
 
 .. _-W:
 
@@ -127,6 +129,8 @@ Optional Arguments
    Input data have a 4th column containing observation point weights.
    These are multiplied with the geometrical weight factor to determine
    the actual weights used in the calculations.
+
+.. include:: explain_-aspatial.rst_
 
 .. |Add_-bi| replace:: [Default is 3 (or 4 if **-W** is set) columns].
 .. include:: explain_-bi.rst_
@@ -140,7 +144,7 @@ Optional Arguments
 .. |Add_-f| unicode:: 0x20 .. just an invisible code
 .. include:: explain_-f.rst_
 
-.. |Add_-g| replace:: 0x20 .. just an invisible code
+.. |Add_-g| unicode:: 0x20 .. just an invisible code
 .. include:: explain_-g.rst_
 
 .. |Add_-h| unicode:: 0x20 .. just an invisible code

@@ -23,6 +23,8 @@ Synopsis (begin mode)
 [ |-F|\ *box* ]
 [ |-M|\ *margins* ]
 [ |-N| ]
+[ |SYN_OPT-R| ]
+[ |-J|\ *parameters* ]
 [ |SYN_OPT-V| ]
 [ |SYN_OPT--| ]
 
@@ -36,11 +38,13 @@ records the current region and projection so that we may return to the initial
 plot environment when  the inset is completed.  The user may select any plot region
 and projection once plotting in the inset, but if the first command uses a projection
 that leaves off the scale or width then we supply a scale or width to fill the inset as best
-as possible, given the inset size and margins (if selected).
+as possible, given the inset size and margins (if selected). **Note**: If you wish to let
+the inset dimensions be determined by the region and projection that will be used to draw in
+the inset, then give these arguments on the **gmt inset begin** command.
 
 
-Required Arguments
-------------------
+Required Arguments (begin mode)
+-------------------------------
 
 .. _-D:
 
@@ -60,26 +64,24 @@ Required Arguments
     if **-DJ** is used then *justify* defaults to the mirror opposite of *refpoint*.
     Specify inset box attributes via the **-F** option [outline only].
 
-Optional Arguments
-------------------
+Optional Arguments (begin mode)
+-------------------------------
 
 .. _-F:
 
-**-F**\ [**+c**\ *clearances*][**+g**\ *fill*][**+i**\ [[*gap*/]\ *pen*]][**+p**\ [*pen*]][**+r**\ [*radius*]][**+s**\ [[*dx*/*dy*/][*shade*]]]
-    Without further options, draws a rectangular border around the map inset using
-    :term:`MAP_FRAME_PEN`; specify a different pen with **+p**\ *pen*.
-    Add **+g**\ *fill* to fill the logo box [no fill].
-    Append **+c**\ *clearance* where *clearance* is either *gap*, *xgap*\ /\ *ygap*,
-    or *lgap*\ /\ *rgap*\ /\ *bgap*\ /\ *tgap* where these items are uniform, separate in
-    x- and y-direction, or individual side spacings between logo and border.
-    Append **+i** to draw a secondary, inner border as well. We use a uniform
-    *gap* between borders of 2\ **p** and the :term:`MAP_DEFAULT_PEN`
-    unless other values are specified. Append **+r** to draw rounded
-    rectangular borders instead, with a 6\ **p** corner radius. You can
-    override this radius by appending another value. Finally, append
-    **+s** to draw an offset background shaded region. Here, *dx*/*dy*
-    indicates the shift relative to the foreground frame
-    [4\ **p**/-4\ **p**] and *shade* changes the fill used for shading [gray50].
+**-F**\ [**+c**\ *clearances*][**+g**\ *fill*][**+i**\ [[*gap*/]\ *pen*]][**+p**\ [*pen*]][**+r**\ [*radius*]]\
+[**+s**\ [[*dx*/*dy*/][*shade*]]]
+
+    Without further options, draws a rectangular border around the map inset using :term:`MAP_FRAME_PEN`. The following
+    modifiers can be appended to |-F|, with additional explanation and examples provided in the :ref:`Background-panel`
+    cookbook section:
+
+    .. include:: explain_-F_box.rst_
+
+.. |Add_-J| replace:: |Add_-J_links|
+.. include:: explain_-J.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 .. _-M:
 
@@ -87,17 +89,23 @@ Optional Arguments
     This is clearance that is added around the inside of the inset.  Plotting will take place
     within the inner region only. The margins can be a single value, a pair of values separated by slashes
     (for setting separate horizontal and vertical margins), or the full set of four margins (for setting
-    separate left, right, bottom, and top margins) [no margins].
+    separate left, right, bottom, and top margins) [no margins]. Append units as desired [Default is set
+    by :term:`PROJ_LENGTH_UNIT`].
 
 .. _-N:
 
 **-N**
     Do NOT clip features extruding outside map inset boundaries [Default will clip].
 
-.. _-V:
+.. |Add_-R| replace:: This is useful when you want the inset **-R -J** to also determine the inset size. |Add_-R_links|
+.. include:: explain_-R.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
-.. |Add_-V| unicode:: 0x20 .. just an invisible code
+.. |Add_-V| replace:: |Add_-V_links|
 .. include:: explain_-V.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 .. include:: explain_help_nopar.rst_
 
@@ -110,12 +118,15 @@ The **end** directive finalizes the current inset, which returns the plotting en
 the state prior to the start of the inset.  The previous region and map projection will be
 in effect going forward.
 
-Optional Arguments
-------------------
+Optional Arguments (end mode)
+-----------------------------
 
 .. _inset_end-V:
 
 .. include:: explain_-V.rst_
+    :start-after: .. _-V:
+    :end-before: **Description**
+
 .. include:: explain_help_nopar.rst_
 
 

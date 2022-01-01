@@ -19,6 +19,7 @@ Synopsis
 [ |-Z| ]
 [ |SYN_OPT-bo| ]
 [ |SYN_OPT-do| ]
+[ |SYN_OPT-h| ]
 [ |SYN_OPT-:| ]
 [ |SYN_OPT--| ]
 
@@ -65,16 +66,19 @@ Optional Arguments
     Output the altitude coordinates as GMT z coordinates [Default will
     output just longitude and latitude].
 
-.. _-V:
-
-.. |Add_-V| unicode:: 0x20 .. just an invisible code
+.. |Add_-V| replace:: |Add_-V_links|
 .. include:: explain_-V.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 .. |Add_-bo| unicode:: 0x20 .. just an invisible code
 .. include:: explain_-bo.rst_
 
 .. |Add_-do| unicode:: 0x20 .. just an invisible code
 .. include:: explain_-do.rst_
+
+.. |Add_-h| unicode:: 0x20 .. just an invisible code
+.. include:: explain_-h.rst_
 
 .. include:: explain_colon.rst_
 

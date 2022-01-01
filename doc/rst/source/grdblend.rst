@@ -12,14 +12,17 @@ Synopsis
 
 .. include:: common_SYN_OPTs.rst_
 
-**gmt grdblend** [ *blendfile* \| *grid1* *grid2* ... ] |-G|\ *outgrid*
+**gmt grdblend**
+[ *blendfile* \| *grid1* *grid2* ... ]
+|-G|\ *outgrid*
 |SYN_OPT-I|
 |SYN_OPT-R|
 [ |-C|\ **f**\|\ **l**\|\ **o**\|\ **u**\ [**+n**\|\ **p**] ]
-[ |-N|\ *nodata* ]
-[ |-Q| ] [ |-Z|\ *scale* ]
+[ |-Q| ]
+[ |-Z|\ *scale* ]
 [ |SYN_OPT-V| ]
 [ |-W|\ [**z**] ]
+[ |SYN_OPT-di| ]
 [ |SYN_OPT-f| ]
 [ |SYN_OPT-n| ]
 [ |SYN_OPT-r| ]
@@ -80,10 +83,10 @@ Required Arguments
 
 .. include:: explain_-I.rst_
 
-.. _-R:
-
-.. |Add_-R| unicode:: 0x20 .. just an invisible code
+.. |Add_-R| replace:: |Add_-R_links|
 .. include:: explain_-R.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 Optional Arguments
 ------------------
@@ -103,21 +106,16 @@ Optional Arguments
     for subsequent grids we only consider them in the decision if the
     values are >= 0 or <= 0, respectively.
 
-.. _-N:
-
-**-N**\ *nodata*
-    No data. Set nodes with no input grid to this value [Default is NaN].
-
 .. _-Q:
 
 **-Q**
     Create plain header-less grid file (for use with external tools).
     Requires that the output grid file is a native format (i.e., not netCDF).
 
-.. _-V:
-
-.. |Add_-V| unicode:: 0x20 .. just an invisible code
+.. |Add_-V| replace:: |Add_-V_links|
 .. include:: explain_-V.rst_
+    :start-after: **Syntax**
+    :end-before: **Description**
 
 .. _-W:
 
@@ -129,6 +127,10 @@ Optional Arguments
 
 **-Z**\ *scale*
     Scale output values by *scale* before writing to file. [1].
+
+.. |Add_-di| replace:: Also sets nodes with no input constraints to this value
+    [Default is NaN].
+.. include:: explain_-di.rst_
 
 .. |Add_-f| unicode:: 0x20 .. just an invisible code
 .. include:: explain_-f.rst_
@@ -156,24 +158,18 @@ Examples
 .. include:: explain_example.rst_
 
 To create a grid file from the four grid files piece\_?.nc, giving them each the different
-weights, make the blendfile like this
-
-   ::
+weights, make the blendfile like this::
 
     piece_1.nc -R<subregion_1> 1
     piece_2.nc -R<subregion_2> 1.5
     piece_3.nc -R<subregion_3> 0.9
     piece_4.nc -R<subregion_4> 1
 
-Then run
-
-   ::
+Then run::
 
     gmt grdblend blend.job -Gblend.nc -R<full_region> -I<dx/dy> -V
 
-To blend all the grids called MB\_\*.nc given them all equal weight, try
-
-   ::
+To blend all the grids called MB\_\*.nc given them all equal weight, try::
 
     gmt grdblend MB_*.nc -Gblend.nc -R<full_region> -I<dx/dy> -V
 
