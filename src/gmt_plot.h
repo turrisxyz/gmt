@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------
  *
- *	Copyright (c) 1991-2021 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
+ *	Copyright (c) 1991-2022 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
  *	See LICENSE.TXT file for copying and redistribution conditions.
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -114,7 +114,7 @@ struct GMT_VECT_ATTR {
 	bool parsed_v4;		/* true if we parsed old-style <vectorwidth/headlength/headwidth> attribute */
 	float v_angle;		/* Head angle */
 	float v_norm;		/* shrink when lengths are smaller than this */
-	float v_stem;		/* Min length in % of visible vector when head is large [10%] */
+	float v_norm_limit;	/* Only shrink down to this factor [0.25] */
 	float v_width;		/* Width of vector stem in inches */
 	float v_shape;		/* Shape of vector head [MAP_VECTOR_SHAPE] */
 	float h_length;		/* Length of vector head in inches */
@@ -141,6 +141,7 @@ struct GMT_SYMBOL {
 	unsigned int read_symbol_cmd;	/* 1 when -S indicated we must read symbol type from file, 2 with -SK is used */
 	bool u_set;		/* true if u was set */
 	bool par_set;		/* true if all parameters were set for e,j */
+	bool degenerate;		/* true for E- and J- as degenerate ellipses and rectangles */
 	double factor;		/* Scaling needed to unify symbol area for circle, triangles, etc. [1] */
 	double size_x;		/* Current symbol size in x */
 	double size_y;		/* Current symbol size in y */

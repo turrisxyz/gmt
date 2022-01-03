@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------
  *
- *	Copyright (c) 1991-2021 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
+ *	Copyright (c) 1991-2022 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
  *	See LICENSE.TXT file for copying and redistribution conditions.
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -23,6 +23,8 @@
  *
  * Brief synopsis: Reads a grid file and writes a portion within it
  * to a new file.
+ *
+ * Note on KEYS: FD(= means -F takes an optional input Dataset as argument which may be followed by optional modifiers.
  */
 
 #include "gmt_dev.h"
@@ -1022,9 +1024,14 @@ EXTERN_MSC int GMT_grdcut (void *V_API, int mode, void *args) {
 	/* Send the subset of the grid or image to the gridfile destination. */
 
 	if (Ctrl->In.type == GMT_IS_GRID) {	/* Write a grid */
-		if (GMT_Set_Comment (API, GMT_IS_GRID, GMT_COMMENT_IS_OPTION | GMT_COMMENT_IS_COMMAND, options, G)) Return (API->error);
-		if (GMT_Write_Data (API, GMT_IS_GRID, GMT_IS_FILE, GMT_IS_SURFACE, GMT_CONTAINER_AND_DATA, NULL, Ctrl->G.file, G) != GMT_NOERROR) {
+		if (GMT_Set_Comment (API, GMT_IS_GRID, GMT_COMMENT_IS_OPTION | GMT_COMMENT_IS_COMMAND, options, G))
 			Return (API->error);
+		if (GMT_Write_Data (API, GMT_IS_GRID, GMT_IS_FILE, GMT_IS_SURFACE, GMT_CONTAINER_AND_DATA, NULL, Ctrl->G.file, G) != GMT_NOERROR)
+			Return (API->error);
+		if (GMT->current.setting.run_mode == GMT_MODERN && HH->cpt) {	/* Save the CPT as the current CPT for a modern mode session */
+			struct GMT_PALETTE *P = gmt_get_palette (GMT, HH->cpt, GMT_CPT_OPTIONAL, G->header->z_min, G->header->z_max, 0.0);
+			if (GMT_Destroy_Data (API, &P) != GMT_NOERROR)
+				Return (API->error);
 		}
 	}
 	else {	/* Write an image */

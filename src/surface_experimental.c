@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------
  *
- *	Copyright (c) 1991-2021 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
+ *	Copyright (c) 1991-2022 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
  *	See LICENSE.TXT file for copying and redistribution conditions.
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -40,6 +40,8 @@
  *    go to larger grids (i.e., adding more nodes).
  * 3. It relies more on functions and macros from GMT to handle rows/cols/node calculations.
  * 4. TESTING: It enables multiple threads via OpenMP [if compiled that way].
+ *
+ * Note on KEYS: DD(= means -D takes an optional input Dataset as argument which may be followed by optional modifiers.
  */
 
 #include "gmt_dev.h"

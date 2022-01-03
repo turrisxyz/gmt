@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------
  *
- *	Copyright (c) 1991-2021 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
+ *	Copyright (c) 1991-2022 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
  *	See LICENSE.TXT file for copying and redistribution conditions.
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -8337,7 +8337,7 @@ struct GMT_PALETTE * gmtlib_read_cpt (struct GMT_CTRL *GMT, void *source, unsign
 	return (X);
 }
 
-char * gmt_cpt_default (struct GMTAPI_CTRL *API, char *cpt, char *file) {
+char * gmt_cpt_default (struct GMTAPI_CTRL *API, char *cpt, char *file, struct GMT_GRID_HEADER *h) {
 	/* Return which type of default CPT this data set should use.
 	 * If cpt is specified then that is what we will use. If not, then
 	 * we determine if file is a remote data set, and if it is and has a
@@ -8346,20 +8346,42 @@ char * gmt_cpt_default (struct GMTAPI_CTRL *API, char *cpt, char *file) {
 	int k_data;
 	static char *srtm_cpt = "srtm";
 	char *curr_cpt = NULL;
+	struct GMT_GRID_HEADER_HIDDEN *HH = gmt_get_H_hidden (h);
 
-	if (cpt) return strdup (cpt);	/* CPT was already specified */
-	if (file == NULL) return NULL;	/* No file given, so there */
-	if (API->GMT->current.setting.run_mode == GMT_MODERN && (curr_cpt = gmt_get_current_item (API->GMT, "cpt", false))) return curr_cpt;	/* Use current CPT */
+	if (cpt) {
+		GMT_Report (API, GMT_MSG_INFORMATION, "gmt_cpt_default: Use specific CPT: %s\n", cpt);
+		return strdup (cpt);	/* CPT was already specified, so use it */
+	}
+	if (file == NULL) {
+		GMT_Report (API, GMT_MSG_INFORMATION, "gmt_cpt_default: No file given so cannot determine\n");
+		return NULL;	/* No file given, so nothing to work with */
+	}
+	if (API->GMT->current.setting.run_mode == GMT_MODERN && (curr_cpt = gmt_get_current_item (API->GMT, "cpt", false))) {
+		GMT_Report (API, GMT_MSG_INFORMATION, "gmt_cpt_default: Use current CPT: %s\n", curr_cpt);
+		return curr_cpt;	/* Use current CPT */
+	}
+	if (HH->cpt && HH->cpt[0] != '-') {
+		GMT_Report (API, GMT_MSG_INFORMATION, "gmt_cpt_default: Use grid header default CPT: %s\n", HH->cpt);
+		return (strdup (HH->cpt));	/* Found default CPT in the grid header */
+	}
 
+	/* Check if we are reading a remote dataset with a default CPT */
 	if ((k_data = gmt_remote_dataset_id (API, file)) == GMT_NOTSET) {
 		size_t LOX;
 		if ((k_data = gmt_get_tile_id (API, file)) == GMT_NOTSET)
 			return NULL;	/* Go with the default, whatever that is */
 		LOX = strlen (file) - 8;	/* Position of the L|O|X flag */
-		if (file[LOX] == 'L') return strdup (srtm_cpt);
+		if (file[LOX] == 'L') {
+			GMT_Report (API, GMT_MSG_INFORMATION, "gmt_cpt_default: Use SRTM default CPT: %s\n", srtm_cpt);
+			return strdup (srtm_cpt);
+		}
 	}
-	if (API->remote_info[k_data].CPT[0] == '-') return (NULL);
+	if (API->remote_info[k_data].CPT[0] == '-') {
+			GMT_Report (API, GMT_MSG_INFORMATION, "gmt_cpt_default: No CPT default for remote dataset %s\n", file);
+		return (NULL);
+	}
 
+	GMT_Report (API, GMT_MSG_INFORMATION, "gmt_cpt_default: Use dataset default CPT: %s\n", API->remote_info[k_data].CPT);
 	return (strdup (API->remote_info[k_data].CPT));
 }
 
@@ -8489,6 +8511,8 @@ struct GMT_PALETTE *gmt_get_palette (struct GMT_CTRL *GMT, char *file, enum GMT_
 
 	if (mode == GMT_CPT_REQUIRED) {	/* The calling function requires the CPT to be present; GMT_Read_Data will work or fail accordingly */
 		P = GMT_Read_Data (GMT->parent, GMT_IS_PALETTE, GMT_IS_FILE, GMT_IS_NONE, GMT_READ_NORMAL|continuous, NULL, file, NULL);
+		if (GMT->parent->gwf_dir == NULL || file == NULL || strstr (file, GMT->parent->gwf_dir) == NULL)	/* Avoid writing a sessions CPT to a sessions CPT */
+			gmt_save_current_cpt (GMT, P, 0);	/* Save for use by session, if modern mode */
 		return (P);
 	}
 
@@ -8544,7 +8568,6 @@ struct GMT_PALETTE *gmt_get_palette (struct GMT_CTRL *GMT, char *file, enum GMT_
 		PH = gmt_get_C_hidden (P);
 		PH->auto_scale = 1;	/* Flag for colorbar to supply -Baf if not given */
 		gmt_stretch_cpt (GMT, P, zmin, zmax);
-		gmt_save_current_cpt (GMT, P, 0);	/* Save for use by session, if modern */
 	}
 	else if (file) {	/* Gave a CPT file */
 		GMT_Report (GMT->parent, GMT_MSG_DEBUG, "CPT argument %s understood to be a regular CPT table\n", file);
@@ -8553,6 +8576,8 @@ struct GMT_PALETTE *gmt_get_palette (struct GMT_CTRL *GMT, char *file, enum GMT_
 	else
 		GMT_Report (GMT->parent, GMT_MSG_ERROR, "No CPT file or master given?\n");
 
+	if (GMT->parent->gwf_dir == NULL || file == NULL || strstr (file, GMT->parent->gwf_dir) == NULL)	/* Avoid writing a sessions CPT to a sessions CPT */
+		gmt_save_current_cpt (GMT, P, 0);	/* Save for use by session, if modern */
 	return (P);
 }
 
@@ -9296,23 +9321,23 @@ void gmtlib_init_cpt (struct GMT_CTRL *GMT, struct GMT_PALETTE *P) {
 }
 
 /*! . */
-int gmt_get_index (struct GMT_CTRL *GMT, struct GMT_PALETTE *P, double value) {
+int gmt_get_index (struct GMT_CTRL *GMT, struct GMT_PALETTE *P, double *value) {
 	unsigned int index, lo, hi, mid;
 	gmt_M_unused(GMT);
 
-	if (gmt_M_is_dnan (value)) return (GMT_NAN - 3);	/* Set to NaN color */
+	if (gmt_M_is_dnan (*value)) return (GMT_NAN - 3);	/* Set to NaN color */
 	if (P->is_wrapping)	/* Wrap to fit CPT range - we can never return back- or fore-ground colors */
-		value = MOD (value - P->data[0].z_low, P->wrap_length) + P->data[0].z_low;	/* Now within range */
-	else if (value > P->data[P->n_colors-1].z_high) {
+		*value = MOD (*value - P->data[0].z_low, P->wrap_length) + P->data[0].z_low;	/* Now within range */
+	else if (*value > P->data[P->n_colors-1].z_high) {
 		if (P->categorical) {	/* Set to NaN for categorical */
-			GMT_Report (GMT->parent, GMT_MSG_WARNING, "Requested color lookup for z = %.12lg is not a categorical value - returning NaN color\n", value);
+			GMT_Report (GMT->parent, GMT_MSG_WARNING, "Requested color lookup for z = %.12lg is not a categorical value - returning NaN color\n", *value);
 			return GMT_NAN - 3;
 		}
 		return (GMT_FGD - 3);	/* Set to foreground color */
 	}
-	else if (value < P->data[0].z_low) {
+	else if (*value < P->data[0].z_low) {
 		if (P->categorical) {	/* Set to NaN for categorical */
-			GMT_Report (GMT->parent, GMT_MSG_WARNING, "Requested color lookup for z = %.12lg is not a categorical value - returning NaN color\n", value);
+			GMT_Report (GMT->parent, GMT_MSG_WARNING, "Requested color lookup for z = %.12lg is not a categorical value - returning NaN color\n", *value);
 			return GMT_NAN - 3;
 		}
 		return (GMT_BGD - 3);	/* Set to background color */
@@ -9332,16 +9357,16 @@ int gmt_get_index (struct GMT_CTRL *GMT, struct GMT_PALETTE *P, double value) {
 	while (lo != hi)
 	{
 		mid = (lo + hi) / 2;
-		if (value >= P->data[mid].z_high)
+		if (*value >= P->data[mid].z_high)
 			lo = mid + 1;
 		else
 			hi = mid;
 	}
 	index = lo;
 	
-	if (value >= P->data[index].z_low && value < P->data[index].z_high) {
-		if (P->categorical && !doubleAlmostEqualZero (P->data[index].z_low, value)) {
-			GMT_Report (GMT->parent, GMT_MSG_WARNING, "Requested color lookup for z = %.12lg is not a categorical value - returning NaN color\n", value);
+	if (*value >= P->data[index].z_low && *value < P->data[index].z_high) {
+		if (P->categorical && !doubleAlmostEqualZero (P->data[index].z_low, *value)) {
+			GMT_Report (GMT->parent, GMT_MSG_WARNING, "Requested color lookup for z = %.12lg is not a categorical value - returning NaN color\n", *value);
 			index = GMT_NAN - 3;	/* Since categorical data is not on an interval */
 		}
 		return (index);
@@ -9353,10 +9378,10 @@ int gmt_get_index (struct GMT_CTRL *GMT, struct GMT_PALETTE *P, double value) {
 	 */
 
 	index = 0;
-	while (index < P->n_colors && ! (value >= P->data[index].z_low && value < P->data[index].z_high) ) index++;
+	while (index < P->n_colors && ! (*value >= P->data[index].z_low && *value < P->data[index].z_high) ) index++;
 	if (index == P->n_colors) index--;	/* Because we use <= for last range */
-	if (P->categorical && !doubleAlmostEqualZero (P->data[index].z_low, value)) {
-		GMT_Report (GMT->parent, GMT_MSG_WARNING, "Requested color lookup for z = %.12lg is not a categorical value - returning NaN color\n", value);
+	if (P->categorical && !doubleAlmostEqualZero (P->data[index].z_low, *value)) {
+		GMT_Report (GMT->parent, GMT_MSG_WARNING, "Requested color lookup for z = %.12lg is not a categorical value - returning NaN color\n", *value);
 		index = GMT_NAN - 3;	/* Since categorical data is not on an interval */
 	}
 	return (index);
@@ -9391,7 +9416,7 @@ void gmt_get_rgb_lookup (struct GMT_CTRL *GMT, struct GMT_PALETTE *P, int index,
 
 /*! . */
 int gmt_get_rgb_from_z (struct GMT_CTRL *GMT, struct GMT_PALETTE *P, double value, double *rgb) {
-	int index = gmt_get_index (GMT, P, value);
+	int index = gmt_get_index (GMT, P, &value);
 	gmt_get_rgb_lookup (GMT, P, index, value, rgb);
 	return (index);
 }
@@ -9418,7 +9443,7 @@ int gmt_get_fill_from_z (struct GMT_CTRL *GMT, struct GMT_PALETTE *P, double val
 	int index;
 	struct GMT_FILL *f = NULL;
 
-	index = gmt_get_index (GMT, P, value);
+	index = gmt_get_index (GMT, P, &value);
 
 	/* Check if pattern */
 
@@ -18066,7 +18091,7 @@ int gmt_write_glue_function (struct GMTAPI_CTRL *API, char* library) {
 
 	qsort (M, n, sizeof (struct GMT_MODULEINFO), gmtsupport_sort_moduleinfo);
 
-	printf ("/*\n * Copyright (c) 2012-2021 by the GMT Team (https://www.generic-mapping-tools.org/team.html)\n");
+	printf ("/*\n * Copyright (c) 2012-2022 by the GMT Team (https://www.generic-mapping-tools.org/team.html)\n");
 	printf (" * See LICENSE.TXT file for copying and redistribution conditions.\n */\n");
 	printf ("/* gmt_%s_glue.c populates the external array of this shared lib with\n", library);
 	printf (" * module parameters such as name, group, purpose and keys strings.\n");

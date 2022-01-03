@@ -1,6 +1,5 @@
 #
-#
-# Copyright (c) 1991-2021 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
+# Copyright (c) 1991-2022 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
 # See LICENSE.TXT file for copying and redistribution conditions.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -667,7 +666,7 @@ if (BUILD_DEVELOPER)
 		gmt_dcw.h gmt_decorate.h gmt_defaults.h gmt_error.h gmt_error_codes.h gmt_fft.h gmt_gdalread.h gmt_grd.h
 		gmt_grdio.h gmt_hash.h gmt_io.h gmt_macros.h gmt_memory.h gmt_modern.h gmt_nan.h gmt_notposix.h gmt_plot.h
 		gmt_private.h gmt_project.h gmt_prototypes.h gmt_psl.h gmt_shore.h gmt_common_sighandler.h gmt_symbol.h gmt_synopsis.h
-		gmt_texture.h gmt_time.h gmt_types.h gmt_dev.h gmt_customio.h gmt_hidden.h gmt_mb.h gmt_remote.h
+		gmt_texture.h gmt_time.h gmt_types.h gmt_dev.h gmt_customio.h gmt_hidden.h gmt_mb.h gmt_remote.h gmt_common_byteswap.h
 		DESTINATION ${GMT_INCLUDEDIR}
 		COMPONENT Runtime)
 	install (FILES compat/qsort.h

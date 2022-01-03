@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------
  *
- *	Copyright (c) 1991-2021 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
+ *	Copyright (c) 1991-2022 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
  *	See LICENSE.TXT file for copying and redistribution conditions.
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -22,6 +22,9 @@
  * Brief synopsis: grdcontour reads a 2-D grid file and contours it,
  * controlled by a variety of options.
  *
+ * Note on KEYS: AD)=t mean -A takes an optional output Dataset as argument via the +t modifier.
+ *               G?(=1 means if -Gf|x is given then we may read an input Dataset, else we set type to ! to skip it.
+ *               The "1" means we must skip the single char (f or x) before finding the file name
  */
 
 #include "gmt_dev.h"
@@ -540,7 +543,7 @@ GMT_LOCAL void grdcontour_sort_and_plot_ticks (struct GMT_CTRL *GMT, struct PSL_
 	double add, dx, dy, x_back, y_back, x_front, y_front, x_end, y_end, x_lbl, y_lbl;
 	double xmin, xmax, ymin, ymax, inc, dist, a, this_lon, this_lat, sa, ca;
 	double *s = NULL, *xp = NULL, *yp = NULL;
-	double da, db, dc, dd;
+	double da, db, dc, dd, L, L_cut;
 
 	double tick_gap = I->dim[GMT_X];
 	double tick_length = I->dim[GMT_Y];
@@ -668,8 +671,13 @@ GMT_LOCAL void grdcontour_sort_and_plot_ticks (struct GMT_CTRL *GMT, struct PSL_
 		if (np == 0) continue;
 
 		s = gmt_M_memory (GMT, NULL, np, double);	/* Compute distance along the contour */
-		for (j = 1, s[0] = 0.0; j < np; j++)
-			s[j] = s[j-1] + hypot (xp[j]-xp[j-1], yp[j]-yp[j-1]);
+		for (j = 1, s[0] = 0.0; j < np; j++) {
+			L = hypot (xp[j]-xp[j-1], yp[j]-yp[j-1]);
+			L_cut = gmt_half_map_width (GMT, 0.5 * (yp[j]+yp[j-1]));
+			if (L > L_cut)	/* Eliminate horizontal jumps exceeding half mapwidth at this y-value */
+				L = 0.0;
+			s[j] = s[j-1] + L;
+		}
 		n_ticks = irint (floor (s[np-1] / tick_gap));
 		if (s[np-1] < GRDCONTOUR_MIN_LENGTH || n_ticks == 0) {	/* Contour is too short to be ticked or labeled */
 			save[pol].do_it = false;

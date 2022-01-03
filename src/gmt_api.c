@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------
  *
- *	Copyright (c) 1991-2021 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
+ *	Copyright (c) 1991-2022 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
  *	See LICENSE.TXT file for copying and redistribution conditions.
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -2988,7 +2988,7 @@ GMT_LOCAL int gmtapi_get_object (struct GMTAPI_CTRL *API, int sfamily, void *ptr
 	 * Unless family is GMT_NOTSET the object must be of the specified family.
 	 */
 	unsigned int item;
-	enum GMT_enum_family family = GMT_NOTSET;
+	enum GMT_enum_family family;
 	int object_ID = GMT_NOTSET;	/* Not found yet */
 	struct GMTAPI_DATA_OBJECT *S_obj = NULL;
 
@@ -3032,7 +3032,7 @@ GMT_LOCAL void * gmtapi_pass_object (struct GMTAPI_CTRL *API, struct GMTAPI_DATA
 						gmt_grd_shift (API->GMT, G, shift_amount);	/* In-memory rotation */
 					}
 				}
-				else if (object->region) {	/* Possibly adjust the pad so inner region matches requested wesn */
+				if (object->region) {	/* Possibly adjust the pad so inner region matches requested wesn */
 					/* NOTE: This assumes the memory cannot be adjusted. Probably should distinguish between GMT_IS_REFERENCE and GMT_IS_DUPLICATE
 					 * and offer different behavior.  As it is we assume read-only grids */
 					if (object->reset_pad) {	/* First undo any prior sub-region used with this memory grid */
@@ -8198,11 +8198,12 @@ void * GMT_Create_Session (const char *session, unsigned int pad, unsigned int m
 
 	if ((API = calloc (1, sizeof (struct GMTAPI_CTRL))) == NULL) return_null (NULL, GMT_MEMORY_ERROR);	/* Failed to allocate the structure */
 	API->verbose = (mode >> 16);	/* Pick up any -V settings from gmt.c */
-	API->pad = pad;		/* Preserve the default pad value for this session */
+	API->remote_id = GMT_NOTSET;     /* Not read a remote grid yet */
+	API->pad = pad;     /* Preserve the default pad value for this session */
 	API->print_func = (print_func == NULL) ? gmtapi_print_func : print_func;	/* Pointer to the print function to use in GMT_Message|Report */
 	API->do_not_exit = mode & GMT_SESSION_NOEXIT;	/* Deprecated, we no longer call exit anywhere in the API (gmt_api.c) */
-    API->external = (mode & GMT_SESSION_EXTERNAL) ? 1 : 0;  /* if false|0 then we don't list read and write as modules */
-    if (API->external && mode & GMT_SESSION_NOGDALCLOSE) API->external = 2;  /* Avoid calling GDALDestroyDriverManager */
+	API->external = (mode & GMT_SESSION_EXTERNAL) ? 1 : 0;  /* if false|0 then we don't list read and write as modules */
+	if (API->external && mode & GMT_SESSION_NOGDALCLOSE) API->external = 2;  /* Avoid calling GDALDestroyDriverManager */
 	API->shape = (mode & GMT_SESSION_COLMAJOR) ? GMT_IS_COL_FORMAT : GMT_IS_ROW_FORMAT;		/* if set then we must use column-major format [row-major] */
 	API->runmode = mode & GMT_SESSION_RUNMODE;		/* If nonzero we set up modern GMT run-mode, else classic */
 	API->no_history = mode & GMT_SESSION_NOHISTORY;		/* If nonzero we disable the gmt.history mechanism (shorthands) entirely */
@@ -12874,8 +12875,28 @@ struct GMT_RESOURCE * GMT_Encode_Options (void *V_API, const char *module_name, 
 	 *   2. pscoast normally plots PostSCript but pscoast -E+l only want to return a text listing of countries.  We allow for this
 	 *      switch by using the key >DE-lL so that if -E with either +l or +L are used we change primary output to D.
 	 *
+     * There can also be complications when an option either takes a file but may also accept optional modifiers, or the
+     * file in question is itself given via an optional modifier.  These cases are encoded this way:
+     *
+     *   A) If an input|output file argument to an option may be followed by optional modifiers we append "=" to that key.
+     *        Example: The dataset given to gmtselect via -C (syntax -C<ptfile>|<lon>/<lat>+d<dist>) needs CD(=.
+     *   B) If an input|output file is given via an option's modifier +x, then we append =x to that key.
+     *        Example: The output dataset file given to grd2cpt via -E (syntax -E[<nlevels>][+c][+f<file>]) needs code ED)=f.
+     *
+     * Both psxy[z] and the contour functions may specify options that may accept file arguments.  These are special cases:
+     *
+     *  A) psxy[z] lists KEY S?(=2. ? means unknown type, but this is replaced by D (dataset) only if -S requests either the
+     *     quoted or decorated lines symbols since these require crossing or fixed-point dataset files.  If any other symbol
+     *     is specified then the type is set to ! which means we skip the processing of this key.
+     *  B) The contour modules have option -G to set annotation placements.  The key is G?(=1 and only if -Gf|x is given will we
+     *     need to read a dataset (so type becomes D), else type is set to ! to skip the processing of this key.
+     *
+     *  The optional integer that may follow the '=' character indicates how many characters must we skip following the option
+     *  switch before we reach the start of the filename.  Since -Gxfile or -Gffile has that initial x or f we use =1.  For the
+     *  psxy[z] command we used =2 since -Sqffile, -Sqxfile, -S~ffile, -S~xfile all imply file starts after 2 leading characters.
+     *  If not given then the default is 0 (i.e., the filename immediately follows the option switch, like in -Adatafile).
+     *
 	 *   After processing, all magic key sequences are set to "---" to render them inactive.
-	 *
 	 */
 
 	unsigned int n_keys, direction = 0, kind, pos = 0, n_items = 0, ku, n_out = 0, nn[2][2];

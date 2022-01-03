@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------------
  *
- *	Copyright (c) 1991-2021 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
+ *	Copyright (c) 1991-2022 by the GMT Team (https://www.generic-mapping-tools.org/team.html)
  *	See LICENSE.TXT file for copying and redistribution conditions.
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -43,6 +43,9 @@
  *
  * PW Update July 2015. With help from Dong Ju Choi, San Diego Supercomputing Center, we have added Open MP
  * support in greenspline and the matrix solvers in gmt_vector.c.  Requires open MP support and use of -x.
+ *
+ * Note on KEYS: CD)=f means -C takes an optional output Dataset as argument via the +f modifier.
+ *               AD(= means -A takes an optional input Dataset as argument which may be followed by optional modifiers.
  */
 
 #include "gmt_dev.h"
