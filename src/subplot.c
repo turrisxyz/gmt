@@ -1533,7 +1533,7 @@ EXTERN_MSC int GMT_subplot (void *V_API, int mode, void *args) {
 		for (row = 0; row < P->nrows; row++) {
 			for (col = 0; col < P->ncolumns; col++) {
 				gmtlib_panel_B_file (API, fig, row, col, file);
-				if (!access (file, F_OK)) gmt_remove_file (GMT, file);
+				gmt_remove_file (GMT, file);
 			}
 		}
 		/* Check if we should draw debug lines */

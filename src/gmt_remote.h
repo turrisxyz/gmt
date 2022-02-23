@@ -72,6 +72,7 @@ enum GMT_tile_coverage {	/* Values in any tile coverage grid (e.g., srtm_tiles.n
 
 #define GMT_HASH_TIME_OUT		10L	/* Not waiting longer than this to time out on getting the hash file */
 #define GMT_CONNECT_TIME_OUT	10L	/* Not waiting longer than this to time out on getting a response from the server */
+#define GMT_CONNECT_TRIES		3	/* Try to download a file 3 times (if errors) until giving up */
 
 #define GMT_TILE_EXTENSION_REMOTE  		"jp2"	/* Tile extension of JPEG2000 files to be downloaded */
 #define GMT_TILE_EXTENSION_REMOTE_LEN	3U		/* Length of JPEG2000 file extension */

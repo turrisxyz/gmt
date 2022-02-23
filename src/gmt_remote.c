@@ -710,7 +710,7 @@ void gmtremote_lock_off (struct GMT_CTRL *GMT, struct LOCFILE_FP **P) {
 
 GMT_LOCAL int gmtremote_get_url (struct GMT_CTRL *GMT, char *url, char *file, char *orig, unsigned int index, bool do_lock) {
 	bool turn_ctrl_C_off = false;
-	int curl_err = 0, error = GMT_NOERROR;
+	int curl_err = 0, error = GMT_NOERROR, try = 0;
 	long time_spent;
 	CURL *Curl = NULL;
 	struct LOCFILE_FP *LF = NULL;
@@ -728,45 +728,58 @@ GMT_LOCAL int gmtremote_get_url (struct GMT_CTRL *GMT, char *url, char *file, ch
 	if (do_lock && (LF = gmtremote_lock_on (GMT, file)) == NULL)
 		return 1;
 
-	/* If file locking held us up as another process was downloading the same file,
-	 * then that file should now be available.  So we check again if it is before proceeding */
+	do {
+		try++;	/* We only want to try this a few times before we truly bail */
 
-	if (do_lock && !access (file, F_OK))
-		goto unlocking1;	/* Yes it was, unlock and return no error */
+		/* If file locking held us up as another process was downloading the same file,
+		 * then that file should now be available.  So we check again if it is before proceeding */
 
-	/* Initialize the curl session */
-	if ((Curl = gmtremote_setup_curl (API, url, file, &urlfile, GMT_HASH_TIME_OUT)) == NULL)
-		goto unlocking1;
+		if (do_lock && !access (file, F_OK))
+			goto unlocking1;	/* Yes it was, unlock and return no error */
 
-	GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "Downloading file %s ...\n", url);
-	gmtremote_turn_on_ctrl_C_check (file);	turn_ctrl_C_off = true;
-	begin = time (NULL);
-	if ((curl_err = curl_easy_perform (Curl))) {	/* Failed, give error message */
-		end = time (NULL);
-		time_spent = (long)(end - begin);
-		GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "Unable to download file %s\n", url);
-		GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "Libcurl Error: %s\n", curl_easy_strerror (curl_err));
-		if (urlfile.fp != NULL) {
-			fclose (urlfile.fp);
-			urlfile.fp = NULL;
+		/* Initialize the curl session */
+		if ((Curl = gmtremote_setup_curl (API, url, file, &urlfile, GMT_HASH_TIME_OUT)) == NULL)
+			goto unlocking1;
+
+		GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "Downloading file %s ...\n", url);
+		if (try == 1) {	/* Only do this once */
+			gmtremote_turn_on_ctrl_C_check (file);
+			turn_ctrl_C_off = true;
 		}
-		if (time_spent >= GMT_HASH_TIME_OUT) {	/* Ten seconds is too long time - server down? */
-			GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "GMT data server may be down - delay checking hash file for 24 hours\n");
-			GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "You can turn remote file download off by setting GMT_DATA_UPDATE_INTERVAL to \"off\"\n");
-			if (orig && !access (orig, F_OK)) {	/* Refresh modification time of original hash file */
-#ifdef WIN32
-				_utime (orig, NULL);
-#else
-				utimes (orig, NULL);
-#endif
-				GMT->current.io.refreshed[index] = GMT->current.io.internet_error = true;
+		begin = time (NULL);
+		curl_err = curl_easy_perform (Curl);
+		if (curl_err == CURLE_OK) {	/* Happy news */
+			error = GMT_NOERROR;
+			if (urlfile.fp) /* close the local file */
+				fclose (urlfile.fp);
+		}
+		else {	/* Failed, give error message */
+			end = time (NULL);
+			time_spent = (long)(end - begin);
+			GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "Unable to download file %s\n", url);
+			GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "Libcurl Error: %s\n", curl_easy_strerror (curl_err));
+			if (urlfile.fp != NULL) {
+				fclose (urlfile.fp);
+				urlfile.fp = NULL;
 			}
+			if (time_spent >= GMT_HASH_TIME_OUT) {	/* Ten seconds is too long time - server down? */
+				GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "GMT data server may be down - delay checking hash file for 24 hours\n");
+				GMT_Report (GMT->parent, GMT_MSG_INFORMATION, "You can turn remote file download off by setting GMT_DATA_UPDATE_INTERVAL to \"off\"\n");
+				if (orig && !access (orig, F_OK)) {	/* Refresh modification time of original hash file */
+#ifdef WIN32
+					_utime (orig, NULL);
+#else
+					utimes (orig, NULL);
+#endif
+					GMT->current.io.refreshed[index] = GMT->current.io.internet_error = true;
+				}
+			}
+			if (gmt_remove_file (GMT, file))	/* Failed to clean up an existing file as well */
+				GMT_Report (API, GMT_MSG_WARNING, "Could not even remove file %s\n", file);
+			error = 1;
 		}
-		error = 1; goto unlocking1;
-	}
-	curl_easy_cleanup (Curl);
-	if (urlfile.fp) /* close the local file */
-		fclose (urlfile.fp);
+		curl_easy_cleanup (Curl);
+	} while (curl_err != CURLE_OK && try <= GMT_CONNECT_TRIES);
 
 unlocking1:
 
@@ -851,7 +864,7 @@ GMT_LOCAL int gmtremote_refresh (struct GMTAPI_CTRL *API, unsigned int index) {
 		GMT_Report (API, GMT_MSG_DEBUG, "Download remote file %s for the first time\n", url);
 		if (gmtremote_get_url (GMT, url, indexpath, NULL, index, true)) {
 			GMT_Report (API, GMT_MSG_INFORMATION, "Failed to get remote file %s\n", url);
-			if (!access (indexpath, F_OK)) gmt_remove_file (GMT, indexpath);	/* Remove index file just in case it got corrupted or zero size */
+			gmt_remove_file (GMT, indexpath);		/* Remove index file just in case it got corrupted or zero size */
 			GMT->current.setting.auto_download = GMT_NO_DOWNLOAD;	/* Temporarily turn off auto download in this session only */
 			GMT->current.io.internet_error = true;		/* No point trying again */
 			return 1;
@@ -901,7 +914,7 @@ GMT_LOCAL int gmtremote_refresh (struct GMTAPI_CTRL *API, unsigned int index) {
 
 		if (gmtremote_get_url (GMT, url, new_indexpath, indexpath, index, false)) {	/* Get the new index file from server */
 			GMT_Report (API, GMT_MSG_DEBUG, "Failed to download %s - Internet troubles?\n", url);
-			if (!access (new_indexpath, F_OK)) gmt_remove_file (GMT, new_indexpath);	/* Remove index file just in case it got corrupted or zero size */
+			gmt_remove_file (GMT, new_indexpath);	/* Remove index file just in case it got corrupted or zero size */
 			gmtremote_lock_off (GMT, &LF);
 			return 1;	/* Unable to update the file (no Internet?) - skip the tests */
 		}
@@ -1339,7 +1352,7 @@ int gmtlib_file_is_jpeg2000_tile (struct GMTAPI_CTRL *API, char *file) {
 
 int gmt_download_file (struct GMT_CTRL *GMT, const char *name, char *url, char *localfile, bool be_fussy) {
 	bool query = gmt_M_file_is_query (url), turn_ctrl_C_off = false;
-	int curl_err, error = 0;
+	int curl_err, error = 0, try = 0;
 	size_t fsize;
 	CURL *Curl = NULL;
 	struct FtpFile urlfile = {NULL, NULL};
@@ -1367,41 +1380,48 @@ int gmt_download_file (struct GMT_CTRL *GMT, const char *name, char *url, char *
 	if (!query && (LF = gmtremote_lock_on (GMT, (char *)name)) == NULL)
 		return 1;
 
-	/* If file locking held us up as another process was downloading the same file,
-	 * then that file should now be available.  So we check again if it is before proceeding */
+	do {
+		try++;	/* We only want to try this a few times before we truly bail */
 
-	if (!access (localfile, F_OK)) {	/* Yes it was! Undo lock and return no error */
-		if (!query)	/* Remove lock file after successful download (unless query) */
-			gmtremote_lock_off (GMT, &LF);
-		return GMT_NOERROR;
-	}
+		/* If file locking held us up as another process was downloading the same file,
+		 * then that file should now be available.  So we check again if it is before proceeding */
 
-	/* Initialize the curl session */
-	if ((Curl = gmtremote_setup_curl (API, url, localfile, &urlfile, 0)) == NULL)
-		goto unlocking2;
-
-	gmtremote_find_and_give_data_attribution (API, name);
-
-	GMT_Report (API, GMT_MSG_INFORMATION, "Downloading file %s ...\n", url);
-	gmtremote_turn_on_ctrl_C_check (localfile);
-	turn_ctrl_C_off = true;
-	if ((curl_err = curl_easy_perform (Curl))) {	/* Failed, give error message */
-		if (be_fussy || !(curl_err == CURLE_REMOTE_FILE_NOT_FOUND || curl_err == CURLE_HTTP_RETURNED_ERROR)) {	/* Unexpected failure - want to bitch about it */
-			GMT_Report (API, GMT_MSG_ERROR, "Libcurl Error: %s\n", curl_easy_strerror (curl_err));
-			GMT_Report (API, GMT_MSG_WARNING, "You can turn remote file download off by setting GMT_DATA_UPDATE_INTERVAL to \"off\"\n");
-			if (urlfile.fp != NULL) {
-				fclose (urlfile.fp);
-				urlfile.fp = NULL;
-			}
-			if (!access (localfile, F_OK) && gmt_remove_file (GMT, localfile))	/* Failed to clean up as well */
-				GMT_Report (API, GMT_MSG_WARNING, "Could not even remove file %s\n", localfile);
+		if (!access (localfile, F_OK)) {	/* Yes it was! Undo lock and return no error */
+			if (!query)	/* Remove lock file after successful download (unless query) */
+				gmtremote_lock_off (GMT, &LF);
+			return GMT_NOERROR;
 		}
-		else if (curl_err == CURLE_COULDNT_CONNECT)
-			GMT->current.io.internet_error = true;	/* Prevent GMT from trying again in this session */
-	}
-	curl_easy_cleanup (Curl);
-	if (urlfile.fp) /* close the local file */
-		fclose (urlfile.fp);
+
+		/* Initialize the curl session */
+		if ((Curl = gmtremote_setup_curl (API, url, localfile, &urlfile, 0)) == NULL)
+			goto unlocking2;
+
+		gmtremote_find_and_give_data_attribution (API, name);
+
+		GMT_Report (API, GMT_MSG_INFORMATION, "Downloading file %s [try %d of %d]...\n", url, try, GMT_CONNECT_TRIES);
+		if (try == 1) {	/* Only do this once */
+			gmtremote_turn_on_ctrl_C_check (localfile);
+			turn_ctrl_C_off = true;
+		}
+		curl_err = curl_easy_perform (Curl);
+		if (curl_err != CURLE_OK) {	/* Failed, give error message */
+			if (be_fussy || !(curl_err == CURLE_REMOTE_FILE_NOT_FOUND || curl_err == CURLE_HTTP_RETURNED_ERROR)) {	/* Unexpected failure - want to bitch about it */
+				GMT_Report (API, GMT_MSG_ERROR, "Libcurl Error: %s\n", curl_easy_strerror (curl_err));
+				GMT_Report (API, GMT_MSG_WARNING, "You can turn remote file download off by setting GMT_DATA_UPDATE_INTERVAL to \"off\"\n");
+				if (urlfile.fp != NULL) {
+					fclose (urlfile.fp);
+					urlfile.fp = NULL;
+				}
+				if (gmt_remove_file (GMT, localfile))	/* Failed to clean up an existing file as well */
+					GMT_Report (API, GMT_MSG_WARNING, "Could not even remove file %s\n", localfile);
+			}
+			else if (curl_err == CURLE_COULDNT_CONNECT)
+				GMT->current.io.internet_error = true;	/* Prevent GMT from trying again in this session */
+		}
+		curl_easy_cleanup (Curl);
+		if (urlfile.fp) /* close the local file */
+			fclose (urlfile.fp);
+	} while (curl_err != CURLE_OK && try <= GMT_CONNECT_TRIES);
 
 unlocking2:
 
@@ -1410,8 +1430,10 @@ unlocking2:
 
 	if (turn_ctrl_C_off) gmtremote_turn_off_ctrl_C_check ();
 
-	if (error == 0) error = gmtremote_convert_jp2_to_nc (API, localfile);
-
+	if (curl_err == CURLE_OK)
+		error = gmtremote_convert_jp2_to_nc (API, localfile);
+	else
+		error = curl_err;
 	return (error);
 }
 

@@ -3355,6 +3355,11 @@ int gmt_raster_type (struct GMT_CTRL *GMT, char *file, bool extra) {
 	if (gmt_M_file_is_memory (file)) {
 		return (file[GMT_VF_TYPE_POS] == 'G') ? GMT_NOTSET : GMT_IS_IMAGE;
 	}
+	if (gmt_M_file_is_remote (file)) {	/* Must download, then modify the name */
+		int k_data;
+		if ((k_data = gmt_remote_dataset_id (GMT->parent, file)) != GMT_NOTSET)
+			return (!strcmp (GMT->parent->remote_info[k_data].ext, "tif") ? GMT_IS_IMAGE : GMT_IS_GRID);
+	}
 	if (gmt_M_file_is_remote (file) || gmt_M_file_is_url (file)) {	/* Must download, then modify the name */
 		j = gmt_download_file_if_not_found (GMT, file, 0);
 		F = strdup (&file[j]);
