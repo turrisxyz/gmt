@@ -634,7 +634,8 @@ EXTERN_MSC int GMT_gravfft (void *V_API, int mode, void *args) {
 			GMT_Report (API, GMT_MSG_ERROR, "Surface and density grids have different intervals\n");
 			Return (GMT_RUNTIME_ERROR);
 		}
-		for (m = 0; m < Rho->header->size; m++) if (gmt_M_is_fnan (Rho->data[m])) Rho->data[m] = Rho->header->z_min;	/* Replace any NaNs with the minimum density */
+		Ctrl->misc.rho = 0.5 * (Rho->header->z_min + Rho->header->z_max);	/* Mid-density */
+		for (m = 0; m < Rho->header->size; m++) Rho->data[m] = (gmt_M_is_fnan (Rho->data[m]) ? Rho->header->z_min : Rho->data[m]) / Ctrl->misc.rho;	/* Replace any NaNs with the minimum density, then normalize all by the mid-density */
 	}
 
 	/* Grids are compatible. Initialize FFT structs, grid headers, read data, and check for NaNs */
@@ -673,7 +674,7 @@ EXTERN_MSC int GMT_gravfft (void *V_API, int mode, void *args) {
 
 	K = FFT_info[0];	/* We only need one of these anyway; K is a shorthand */
 
-	Ctrl->misc.z_level = fabs (FFT_info[0]->coeff[0]);	/* Need absolute value or level removed for uppward continuation */
+	Ctrl->misc.z_level = fabs (FFT_info[0]->coeff[0]);	/* Need absolute value or level removed for upward continuation */
 	GMT_Report (API, GMT_MSG_INFORMATION, "Level used for upward continuation: %g\n", Ctrl->misc.z_level);
 
 	if (Ctrl->I.active) {		/* Compute admittance or coherence from data and exit */
