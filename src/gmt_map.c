@@ -2161,7 +2161,7 @@ GMT_LOCAL void gmtmap_setxy (struct GMT_CTRL *GMT, double xmin, double xmax, dou
 	bool update_parameters = false;
 	double fw, fh, fx, fy, w, h;
 
-	/* Set up the original min/max values, the rectangular map dimensionsm and the projection offset */
+	/* Set up the original min/max values, the rectangular map dimensions and the projection offset */
 	GMT->current.proj.rect_m[XLO] = xmin;	GMT->current.proj.rect_m[XHI] = xmax;	/* This is in original meters */
 	GMT->current.proj.rect_m[YLO] = ymin;	GMT->current.proj.rect_m[YHI] = ymax;
 	GMT_Report (GMT->parent, GMT_MSG_DEBUG, "Projected values in meters: %g %g %g %g\n", xmin, xmax, ymin, ymax);
@@ -2171,13 +2171,19 @@ GMT_LOCAL void gmtmap_setxy (struct GMT_CTRL *GMT, double xmin, double xmax, dou
 	GMT->current.proj.origin[GMT_Y] = -ymin * GMT->current.proj.scale[GMT_Y];
 	if (GMT->current.proj.obl_flip) {
 		GMT->current.proj.origin[GMT_Y] = ymax * GMT->current.proj.scale[GMT_Y];
-		GMT->current.proj.scale[GMT_Y] = -GMT->current.proj.scale[GMT_Y];
+		GMT->current.proj.scale[GMT_Y]  = -GMT->current.proj.scale[GMT_Y];
 	}
 
 	if (!strncmp (GMT->init.module_name, "inset", 5U))
 		no_scaling = 1;	/* Don't scale yet if we are calling inset begin (inset end would come here too but not affected since no mapping done by that module) */
 
-	w = GMT->current.proj.rect[XHI];	h = GMT->current.proj.rect[YHI];
+	if (GMT->current.proj.three_D) {	/* Must use 3-D projected BB */
+		w = GMT->current.proj.z_project.xmax - GMT->current.proj.z_project.xmin;
+		h = GMT->current.proj.z_project.ymax - GMT->current.proj.z_project.ymin;
+	}
+	else {
+		w = GMT->current.proj.rect[XHI];	h = GMT->current.proj.rect[YHI];
+	}
 
 	/* Check inset first since an inset may be inside a subplot but there are no subplots inside an inset */
 	if (I->active && no_scaling == 0) {	/* Must rescale to fit inside the inset dimensions and set dx,dy for centering */

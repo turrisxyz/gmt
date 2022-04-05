@@ -64,7 +64,7 @@
 #define THIS_MODULE_PURPOSE	"Manage modern mode figure subplot configuration and selection"
 #define THIS_MODULE_KEYS	""
 #define THIS_MODULE_NEEDS	""
-#define THIS_MODULE_OPTIONS	"-JRVXY"
+#define THIS_MODULE_OPTIONS	"-JRVXYp"
 
 /* Control structure for subplot */
 
@@ -679,6 +679,18 @@ static int parse (struct GMT_CTRL *GMT, struct SUBPLOT_CTRL *Ctrl, struct GMT_OP
 
 		if (GMT->common.J.active) {	/* Compute map height from -R -J */
 			if (gmt_map_setup (GMT, GMT->common.R.wesn)) n_errors++;
+			if (API->GMT->current.proj.three_D) {	/* Must compute 3-D projected BB and shrink width and height */
+				double shrink_3D;
+				GMT->current.map.width  = API->GMT->current.proj.z_project.xmax - API->GMT->current.proj.z_project.xmin;
+				GMT->current.map.height = API->GMT->current.proj.z_project.ymax - API->GMT->current.proj.z_project.ymin;
+				for (j = 0; j < Ctrl->N.dim[GMT_X]; j++) {
+					shrink_3D = Ctrl->F.w[j] / GMT->current.map.width;
+					Ctrl->F.w[j] *= shrink_3D;
+				}
+				GMT->current.map.width  *= shrink_3D;
+				GMT->current.map.height *= shrink_3D;
+				GMT_Report (API, GMT_MSG_DEBUG, "Subplot: 3-D projection changed width/height to = %g/%g [Shrunk by %lg]\n", GMT->current.map.width, GMT->current.map.height, shrink_3D);
+			}
 			for (j = 0; j < Ctrl->N.dim[GMT_Y]; j++) Ctrl->F.h[j] = GMT->current.map.height;
 		}
 		if (B_args) {	/* Got common -B settings that applies to all axes not controlled by -Sr, -Sc */
