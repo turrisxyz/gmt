@@ -95,6 +95,7 @@
 #ifdef WIN32
 #include <windows.h>
 #endif
+#include "gmt_gsformats.h"
 
 #define THIS_MODULE_CLASSIC_NAME	"movie"
 #define THIS_MODULE_MODERN_NAME	"movie"
@@ -1026,7 +1027,10 @@ static int parse (struct GMT_CTRL *GMT, struct MOVIE_CTRL *Ctrl, struct GMT_OPTI
 					s[0] = '\0';	/* Truncate for now */
 				}
 				if ((c = strchr (opt->arg, ',')) ) {	/* Gave frame and format */
-					Ctrl->M.format = strdup (&c[1]);
+					if (!strncmp (&c[1], "view", 4U))  /* Check for using 'view' to set with GMT_GRAPHICS_FORMAT */
+						Ctrl->M.format = strdup (gmt_session_format[API->GMT->current.setting.graphics_format]);
+					else
+						Ctrl->M.format = strdup (&c[1]);
 					c[0] = '\0';	/* Chop off format */
 					switch (opt->arg[0]) {
 						case 'f':	Ctrl->M.frame  = 0; break;
@@ -1046,7 +1050,10 @@ static int parse (struct GMT_CTRL *GMT, struct MOVIE_CTRL *Ctrl, struct GMT_OPTI
 					}
 				}
 				else if (opt->arg[0])	/* Must be format, with frame = 0 implicit */
-					Ctrl->M.format = strdup (opt->arg);
+					if (strchr ("v", opt->arg[0])) /* Check for using 'view' to set with GMT_GRAPHICS_FORMAT */
+						Ctrl->M.format = strdup (gmt_session_format[API->GMT->current.setting.graphics_format]);
+					else
+						Ctrl->M.format = strdup (opt->arg);
 				else /* Default is PDF of frame 0 */
 					Ctrl->M.format = strdup ("pdf");
 				if (s) s[0] = '+';	/* Restore */
@@ -2069,7 +2076,7 @@ EXTERN_MSC int GMT_movie (void *V_API, int mode, void *args) {
 				/* Note: All dimensions are written in inches and read as inches in gmt_plotinit */
 
 				for (T = 0; T < Ctrl->n_items[k]; T++) {
-					t = (frame + 1.0) / n_frames;
+					t = frame / (n_frames - 1.0);	/* Relative time 0-1 for selected frame */
 					I = &Ctrl->item[k][T];	/* Shorthand for this item */
 					/* Set selected font: Prepend + if user specified a font, else just give current default font */
 					if (I->font.size > 0.0)	/* Users selected font */
@@ -2086,7 +2093,7 @@ EXTERN_MSC int GMT_movie (void *V_API, int mode, void *args) {
 						else	/* Current frame only */
 							use_frame = data_frame;
 						if (I->kind == 'F' && p == 0) strcat (label, "-R");	/* We will write a functioning -R option to plot the time-axis */
-						t = (use_frame + 1.0) / n_frames;	/* Relative time 0-1 for selected frame */
+						t = use_frame / (n_frames - 1.0);	/* Relative time 0-1 for selected frame */
 						if (I->mode == MOVIE_LABEL_IS_FRAME) {	/* Place a frame counter */
 							if (I->format[0] && movie_valid_format (I->format, 'd'))	/* Set as integer */
 								sprintf (string, I->format, (int)use_frame);

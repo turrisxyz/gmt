@@ -33,7 +33,7 @@ if (SPHINX_FOUND)
 	endforeach (_fig ${_scripts_ps2png})
 
 	# Convert PS to PDF
-	set (_scripts_ps2pdf images/GMT_RGBchart_a4.ps images/GMT_RGBchart_letter.ps images/GMT_RGBchart_tabloid.ps images/GMT_App_F_stand+_iso+.ps images/GMT_App_F_symbol_dingbats.ps)
+	set (_scripts_ps2pdf images/GMT_RGBchart.ps images/GMT_App_F_stand+_iso+.ps images/GMT_App_F_symbol_dingbats.ps)
 	set (_scripts_pdf)
 	foreach (_fig ${_scripts_ps2pdf})
 		string (REPLACE ".ps" ".pdf" _pdf_fig ${_fig})
@@ -77,7 +77,7 @@ endforeach()
 
 # Remove GMT_latex.sh if latex or dvips not found
 if (NOT LATEX OR NOT DVIPS)
-	list (REMOVE_ITEM _scripts_tests doc/scripts/GMT_latex.sh doc/scripts/GMT_slope2intensity.sh)
+	list (REMOVE_ITEM _scripts_tests doc/scripts/GMT_latex.sh doc/scripts/GMT_slope2intensity.sh doc/scripts/GMT_seamount_density.sh)
 endif (NOT LATEX OR NOT DVIPS)
 
 if (DO_TESTS AND BASH)
