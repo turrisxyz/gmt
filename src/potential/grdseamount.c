@@ -91,6 +91,7 @@ struct SLIDE {	/* Hold information for one slide */
 	double r1, r2;		/* The corresponding radii for h1, h2 */
 	double rc;			/* Radius to start of distal deposit */
 	double rd;			/* Radius to end of distal deposit */
+	double eta;			/* Fraction of slide volume to volume above cone and below parabola */
 };
 
 struct SEAMOUNT {	/* Hold information for one seamount */
@@ -963,7 +964,7 @@ GMT_LOCAL bool grdseamount_node_in_sector (struct GMT_CTRL *GMT, struct SEAMOUNT
 GMT_LOCAL double grdseamount_slide_height (struct GMT_CTRL *GMT, struct SEAMOUNT *SMT, unsigned int slide, double r_km, double r, double hf, double s) {
 	/* r is normalized radial position (0-1), and input hf and output height h are as well.
 	 * s is the azimuthal scale which is 0 if no azimuth variation was requested. */
-	double u, this_r = r * r_km, q, hs, h, rc, rd, hc;
+	double u, this_r = r * r_km, q, hs, h, rc, rd, hc, dh;
 	struct SLIDE *S = &SMT->Slide[slide];
 	gmt_M_unused (GMT);
 
@@ -987,8 +988,15 @@ GMT_LOCAL double grdseamount_slide_height (struct GMT_CTRL *GMT, struct SEAMOUNT
 	if (this_r >= S->r1) return hf;	/* Between foot of slide and toe of deposit, return the regular height */
 	/* Here we are within the slide radial range */
 	u = ((this_r - S->r2) / (S->r1 - S->r2));	/* Normalized radial u inside the slide range of 0-1 */
-	q = S->u0_effective * ((1.0 + S->u0_effective) / (u + S->u0_effective) - 1.0);	/* Normalized slide shape function q(u) */
-	hs = S->h1 + (S->h2 - S->h1) * q;	/* Slide height scaled to actual topography */
+	dh = S->h2 - S->h1;
+	if (S->eta < 1.0) {	/* Only happens for small volumes and parabola shapes */
+		double h_line = S->h2 - u * dh;	/* Straight line connecting (r1,h1) and (r2,h2) */
+		hs = h_line + S->eta * (hf - h_line);	/* A height in-between line and parabola */
+	}
+	else {	/* q(u) is below flank */
+		q = S->u0_effective * ((1.0 + S->u0_effective) / (u + S->u0_effective) - 1.0);	/* Normalized slide shape function q(u) */
+		hs = S->h1 + (S->h2 - S->h1) * q;	/* Slide height scaled to actual topography */
+	}
 	h = (1.0 - s) * hf + s * hs;		/* Handle azimuthal variation (if any) by blending flank and slide heights using s(alpha) */
 	return (h);
 }
@@ -1799,7 +1807,7 @@ EXTERN_MSC int GMT_grdseamount (void *V_API, int mode, void *args) {
 			r_max = r_boost * r_km;	/* No point searching beyond this radius */
 			if (Ctrl->S.slide) {	/* Compute the radii needed for slide calculations below. ASSUMES CIRCULAR FOR NOW */
 				unsigned int slide, want_specific_volume = 0;	/* >0  in cases were we must recompute u0 from desired volume fraction */
-				double Vf, Vs, Vq, V0, Vs_0, s_bar, phi_0, phi;
+				double Vf, Vs, Vq, V0, Vs_0, Vf_c, s_bar, phi_0, phi;
 
 				/* Get full seamount volume (once) */
 				shape_func[this_smt.build_mode] (major, minor, amplitude, 0.0, f, NULL, &V0, NULL);
@@ -1811,6 +1819,8 @@ EXTERN_MSC int GMT_grdseamount (void *V_API, int mode, void *args) {
 					this_smt.Slide[slide].r2 = grdseamount_r_from_h (this_smt.build_mode, this_smt.Slide[slide].h2, major, this_smt.height, f);
 					this_smt.Slide[slide].rc = grdseamount_r_from_h (this_smt.build_mode, this_smt.Slide[slide].hc, major, this_smt.height, f);
 					Vf = pappas_func[this_smt.build_mode] (major, this_smt.height, f, this_smt.Slide[slide].r1, this_smt.Slide[slide].r2);	/* Volume beneath flank surface for given shape */
+					if (this_smt.build_mode == SHAPE_PARA)	/* Must check since there is an upper limit on u0 for paraboloids */
+						Vf_c = pappas_func[SHAPE_CONE] (major, this_smt.height, f, this_smt.Slide[slide].r1, this_smt.Slide[slide].r2);	/* Volume beneath flank surface for a cone */
 					if (Ctrl->T.active) {	/* Must check if we are in the right time window for a slide and if dealing with a partial slide */
 						if (this_user_time >= this_smt.Slide[slide].t0) continue;	/* Not started sliding yet, skip here */
 						if (this_user_time <  this_smt.Slide[slide].t1 && !exact) continue;	/* Completed sliding so making no contribution to incremental discs, again skip */
@@ -1837,8 +1847,18 @@ EXTERN_MSC int GMT_grdseamount (void *V_API, int mode, void *args) {
 						this_smt.Slide[slide].u0_effective = grdseamount_slide_u0 (GMT, &this_smt.Slide[slide], Vf, V0, phi);	/* Corresponding u0 to use */
 						Vs_0 = phi * V0;
 					}
-					else	/* None of that silliness, just use the u0 you were given */
+					else {	/* None of that silliness, just use the u0 you were given */
 						this_smt.Slide[slide].u0_effective = this_smt.Slide[slide].u0;
+						if (this_smt.build_mode == SHAPE_PARA) {	/* Must check since there is an upper limit on u0 for paraboloids */
+							double phi_limit, u0_limit;
+							phi_limit = (Vf - Vf_c) / V0;	/* This is the "slide" volume if u0 is infinity */
+							u0_limit = grdseamount_slide_u0 (GMT, &this_smt.Slide[slide], Vf, V0, phi_limit);	/* Corresponding u0 to use */
+							if (this_smt.Slide[slide].u0_effective > u0_limit) {
+								GMT_Report (API, GMT_MSG_WARNING, "Seamount # %d: For parabolic seamounts your u0 cannot be larger than %lg; reset from %lg to %lg\n", smt, u0_limit, this_smt.Slide[slide].u0_effective, u0_limit);
+								this_smt.Slide[slide].u0_effective = u0_limit;
+							}
+						}
+					}
 					/* Here we know the effective u0. Now we can compute the current Vq volume (volume beneath slide surface) */
 					Vq = grdseamount_pappas_slide (&this_smt.Slide[slide], this_smt.Slide[slide].u0_effective);	/* Volume beneath slide surface for this u0 */
 					if (want_specific_volume == 2)	/* The u0 was selected to yield the required Vs, so Vq is correct for this time and +p, etc */
@@ -1850,6 +1870,7 @@ EXTERN_MSC int GMT_grdseamount (void *V_API, int mode, void *args) {
 					this_smt.Slide[slide].rd = grdseamount_distal_r (&this_smt.Slide[slide], major, Vs);	/* Compute nominal rd radius */
 					if (this_smt.Slide[slide].rd > r_max) r_max = this_smt.Slide[slide].rd;	/* Must go all the way to the end of the mass redistribution */
 					phi_0 = 100.0 * theta * Vs_0 / V0;	/* Compute the equivalent phi for the final Vs_0 volume */
+					this_smt.Slide[slide].eta = (this_smt.build_mode == SHAPE_PARA) ? Vs / (Vf - Vf_c) : 1.0;	/* Only relevant for paraboloids */
 					GMT_Report (API, GMT_MSG_INFORMATION, "Seamount # %d Slide %d: r2 = %.16lg r1 = %.16lg rc = %.16lg rd = %.16lg, u0 = %.16lg, p = %.16lg, Vs = %.16lg, Vf = %.16lg phi = %lg%%\n",
 						smt, slide, this_smt.Slide[slide].r2, this_smt.Slide[slide].r1, this_smt.Slide[slide].rc, this_smt.Slide[slide].rd, this_smt.Slide[slide].u0_effective, this_smt.Slide[slide].p, Vs * theta * s_bar, Vf * theta, phi_0);
 				}
