@@ -793,7 +793,7 @@ static int parse (struct GMT_CTRL *GMT, struct GMTMATH_CTRL *Ctrl, struct GMT_OP
 				break;
 			case '>':	/* Output file specified via an API; set output file here */
 				opt->option = GMT_OPT_OUTFILE;
-				if (opt->arg[0] && !Ctrl->Out.file) Ctrl->Out.file = strdup (opt->arg);
+				n_errors += gmt_get_required_file (GMT, opt->arg, opt->option, 0, GMT_IS_DATASET, GMT_OUT, GMT_FILE_LOCAL, &(Ctrl->Out.file));
 				missing_equal = false;
 				break;
 			case '#':	/* Skip numbers */
