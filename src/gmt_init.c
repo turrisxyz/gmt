@@ -11468,21 +11468,42 @@ unsigned int gmtlib_setparameter (struct GMT_CTRL *GMT, const char *keyword, cha
 				error = true;
 			break;
 		case GMTCASE_IO_NC4_CHUNK_SIZE:
-				if (*lower_value == 'a') /* auto */
+			if (*lower_value == 'a') /* auto */
 				GMT->current.setting.io_nc4_chunksize[0] = k_netcdf_io_chunked_auto;
 			else if (*lower_value == 'c') /* classic */
 				GMT->current.setting.io_nc4_chunksize[0] = k_netcdf_io_classic;
-			else if ((i = sscanf (value, "%" PRIuS " , %" PRIuS, /* Chunk size: vert,hor */
-			         &GMT->current.setting.io_nc4_chunksize[0], &GMT->current.setting.io_nc4_chunksize[1])) > 0) {
-				if (i == 1) /* Use chunk size for both horizontal and vertical dimension */
-					GMT->current.setting.io_nc4_chunksize[1] = GMT->current.setting.io_nc4_chunksize[0];
-				if (GMT->current.setting.io_nc4_chunksize[0] <= k_netcdf_io_chunked_auto ||
-				    GMT->current.setting.io_nc4_chunksize[1] <= k_netcdf_io_chunked_auto)
-					/* Chunk size too small */
+			else {	/* Gave specific dimensions */
+				unsigned int a, b, c;
+				if ((i = sscanf (value, "%u, %u, %u", &a, &b, &c)) > 0) {	/* Chunk size: [z,]vert,hor */
+					switch (i) {
+						case 1: /* Use chunk size for both horizontal and vertical dimension */
+							GMT->current.setting.io_nc4_chunksize[0] = GMT->current.setting.io_nc4_chunksize[1] = a;
+							break;
+						case 2: /* Give separate vertical and horizontal chunk sizes */
+							GMT->current.setting.io_nc4_chunksize[0] = a;
+							GMT->current.setting.io_nc4_chunksize[1] = b;
+							break;
+						default: 	/* I.e., gave separate chunks for depth, vertical and horizontal */
+							GMT->current.setting.io_nc4_chunksize[2] = a;
+							GMT->current.setting.io_nc4_chunksize[0] = b;
+							GMT->current.setting.io_nc4_chunksize[1] = c;
+							if (GMT->current.setting.io_nc4_chunksize[2] <= k_netcdf_io_chunked_auto) {
+								GMT_Report (GMT->parent, GMT_MSG_ERROR, "Chunk size for depth in cube is too small\n");
+								error = true;	/* Chunk size too small */
+							}
+							break;
+					}
+					if (GMT->current.setting.io_nc4_chunksize[0] <= k_netcdf_io_chunked_auto ||
+						 GMT->current.setting.io_nc4_chunksize[1] <= k_netcdf_io_chunked_auto) {
+							GMT_Report (GMT->parent, GMT_MSG_ERROR, "Chunk size for horizontal or vertical dimension is too small\n");
+							error = true;	/* Chunk size too small */
+					}
+				}
+				else {	/* Gave no argument */
+					GMT_Report (GMT->parent, GMT_MSG_ERROR, "No chunk sizes given\n");
 					error = true;
+				}
 			}
-			else
-				error = true;
 			break;
 		case GMTCASE_IO_NC4_DEFLATION_LEVEL:
 			if (!strcmp (lower_value, "false"))
@@ -12899,10 +12920,17 @@ char *gmtlib_getparameter (struct GMT_CTRL *GMT, const char *keyword) {
 				strcpy (value, "auto");
 			else if (GMT->current.setting.io_nc4_chunksize[0] == k_netcdf_io_classic)
 				strcpy (value, "classic");
-			else
-				snprintf (value, GMT_LEN256, "%" PRIuS ",%" PRIuS, /* chunk size: lat,lon */
-						 GMT->current.setting.io_nc4_chunksize[0],
-						 GMT->current.setting.io_nc4_chunksize[1]);
+			else {
+				if (GMT->current.setting.io_nc4_chunksize[2] == k_netcdf_io_chunked_auto)	/* No cube setting */
+					snprintf (value, GMT_LEN256, "%" PRIuS ",%" PRIuS, /* chunk size: lat,lon */
+						GMT->current.setting.io_nc4_chunksize[0],
+						GMT->current.setting.io_nc4_chunksize[1]);
+				else
+					snprintf (value, GMT_LEN256, "%" PRIuS ",%" PRIuS ",%" PRIuS, /* chunk size: z,lat,lon */
+						GMT->current.setting.io_nc4_chunksize[2],
+						GMT->current.setting.io_nc4_chunksize[0],
+						GMT->current.setting.io_nc4_chunksize[1]);
+			}
 			break;
 		case GMTCASE_IO_NC4_DEFLATION_LEVEL:
 			snprintf (value, GMT_LEN256, "%u", GMT->current.setting.io_nc4_deflation_level);

@@ -118,7 +118,7 @@ struct GMT_DEFAULTS {
 	uint64_t n_bin_header_cols;		/* Minimum number of columns in a binary file for which the all cols == NaN means segment header [2] */
 	unsigned int io_n_header_items;		/* Number of header records expected when -h is used [1]; else 0 */
 	unsigned int io_nan_mode;		/* -s: 1 means skip NaN (x,y) records on output, 2 = inverse (only output nan-records; -sr), 0 reports all records */
-	size_t io_nc4_chunksize[2];         /* NetCDF chunk size (lat,lon) on output [0] */
+	size_t io_nc4_chunksize[3];         /* NetCDF chunk size ([z,]lat,lon) on output [0] */
 	unsigned int io_nc4_deflation_level;/* NetCDF deflation level on output [0] */
 	unsigned int io_first_header;       /* 2 means never write single-segment header, 1 means we always write segment header, 0 means write if needed [0] */
 	bool io_gridfile_shorthand;         /* Use shorthand suffix notation for embedded grid file formats [false] */

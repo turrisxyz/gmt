@@ -607,6 +607,7 @@ GMT_LOCAL int gmtnc_grd_info (struct GMT_CTRL *GMT, struct GMT_GRID_HEADER *head
 		if (GMT->current.setting.io_nc4_chunksize[0] != k_netcdf_io_classic) {
 			/* set chunk size */
 			size_t nc4_chunksize[3] = {0, 0, 0};
+			nc4_chunksize[0] = GMT->current.setting.io_nc4_chunksize[2];	/* Will be overwritten next unless cube */
 			gmt_M_memcpy (&nc4_chunksize[cube], GMT->current.setting.io_nc4_chunksize, 2U, size_t);
 			gmt_M_err_trap (nc_def_var_chunking (ncid, z_id, NC_CHUNKED, nc4_chunksize));
 			/* set deflation level and shuffle for x, y[, z], and z[|w] variable */
